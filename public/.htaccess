@@ -1,0 +1,7 @@
+RewriteEngine On
+
+RewriteRule ^(\.env|composer\.json|composer\.lock|vendor/) - [F,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]

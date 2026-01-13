@@ -1,0 +1,229 @@
+@extends($themeLayout)
+
+@section('content')
+
+@push('styles')
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+@endpush
+
+<div class="max-w-4xl mx-auto bg-white rounded-lg shadow overflow-hidden border">
+    <div class="bg-gray-800 h-32 flex">
+        <h1 class="text-2xl font-bold text-white-500 items-center text-left">
+            <p class="m-5 ml-44 mt-20 text-white text-justify">
+                {{ $character->name }}
+            </p>
+
+
+        </h1>
+    </div>
+    
+    <div class="px-6 pb-6 relative">
+        <div class="absolute -top-16 left-6">
+            <div class="w-32 h-32 bg-white rounded-full p-1 shadow-lg">
+                <img src="{{ $character->image_path }}" class="w-full h-full rounded-full object-cover bg-gray-200">
+            </div>
+        </div>
+
+        <div class="ml-40 pt-2 flex justify-between items-start">
+            <div>
+                <p class="text-gray-500 mt-1">{{ $owner }}</p>
+            </div>
+            
+            @if(isset($_SESSION['user_idx']) && $_SESSION['user_idx'] == $character->user_id)
+            <div class="space-x-2">
+                <a href="{{ $currentUrl }}/{{ $character->id }}/edit" class="text-gray-500 hover:text-blue-600 text-sm font-bold">수정</a>
+
+                <form action="{{ $currentUrl }}/{{ $character->id }}/delete" method="POST" class="inline-block" onsubmit="return confirm('삭제하시겠습니까?')">
+                    <input type="hidden" name="id" value="{{ $character->id }}">
+                    <button type="submit" class="text-gray-500 hover:text-red-600 text-sm font-bold">삭제</button>
+                </form>
+            </div>
+            @endif
+        </div>
+        <div class="mt-8">
+            <div class="text-center">
+                <p class="text-2xl font-bold"> " {{ $character->description }} "</p>
+                <img src="{{ $character->image_path2 }}" class="inline-block">
+            </div>
+            <hr class="mb-10">
+            @if(!empty($profile))
+            <div class="space-y-4">
+                @foreach($profile as $item)
+                <div class="flex border-b border-gray-100 pb-2">
+                    <span class="w-1/3 text-gray-500 font-medium pt-1">{{ $item['key'] }}</span>
+                    <div class="flex-1 text-gray-800">
+                        
+                        @if(isset($item['type']) && $item['type'] === 'file' && $item['value'] != "")
+                            @if(preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $item['value']))
+                                <img src="{{ $item['value'] }}" class="max-w-xs rounded border">
+                            @else
+                                <a href="{{ $item['value'] }}" target="_blank" class="text-blue-600 underline">
+                                    💾 첨부파일 열기 ({{ basename($item['value']) }})
+                                </a>
+                            @endif
+
+                        @elseif(isset($item['type']) && $item['type'] === 'textarea')
+                            <div class="whitespace-pre-wrap">{{ $item['value'] }}</div>
+                        
+                        @else
+                            {{ $item['value'] }}
+                        @endif
+
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+        </div>
+
+        <div class="mt-12">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <span class="mr-2">🧩</span> 관계
+            </h3>
+
+            <div id="relation-list" class="grid grid-cols-1 md:grid-cols-1 gap-4">
+                @forelse($relations as $rel)
+                <div data-id="{{ $rel['target_id'] }}" class="bg-gray-50 border border-gray-100 rounded-lg p-3 flex items-start relative group hover:shadow-sm transition">
+                    @if(isset($_SESSION['user_idx']) && $_SESSION['user_idx'] == $character->user_id)
+                    <div class="drag-handle cursor-move absolute top-2 left-2 text-gray-300 hover:text-gray-500 z-10 p-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path></svg>
+                    </div>
+                    <div class="ml-6 w-14 h-14 rounded-full overflow-hidden flex-shrink-0 border border-gray-200 mr-3 mt-1">
+                    @else
+                    <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 border border-gray-200 mr-3 mt-1">
+                    @endif
+                        <img src="{{ $rel['target_image'] }}" class="w-full h-full object-cover">
+                    </div>
+                    
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <a href="{{ $currentUrl }}/{{ $rel['target_id'] }}" class="text-sm font-bold text-gray-800 hover:text-indigo-600 hover:underline">
+                                {{ $rel['target_name'] }}
+                            </a>
+                            <span class="text-xs font-mono px-2 py-0.5 rounded bg-white border">
+                                @if($rel['favor'] > 0)
+                                    💖 +{{ $rel['favor'] }}
+                                @elseif($rel['favor'] < 0)
+                                    💔 {{ $rel['favor'] }}
+                                @else
+                                    😶 0
+                                @endif
+                            </span>
+                        </div>
+                        
+                        <div class="text-sm text-gray-600 mt-1 break-words leading-relaxed">
+                            {!! $rel['text'] !!}
+                        </div>
+                    </div>
+
+                    @if(isset($_SESSION['user_idx']) && $_SESSION['user_idx'] == $character->user_id)
+                    <form action="{{ $currentUrl }}/{{ $character->id }}/relation/delete" method="POST" onsubmit="return confirm('삭제하시겠습니까?');" class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition">
+                        <input type="hidden" name="target_id" value="{{ $rel['target_id'] }}">
+                        <button type="submit" class="bg-red-500 text-white rounded-full p-1 shadow hover:bg-red-600">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </form>
+                    @endif
+                </div>
+                @empty
+                <div class="col-span-full text-center text-gray-400 text-sm py-4 bg-gray-50 rounded border border-dashed">
+                    등록된 관계가 없습니다.
+                </div>
+                @endforelse
+            </div>
+
+            @if(isset($_SESSION['user_idx']) && $_SESSION['user_idx'] == $character->user_id)
+            <div class="mt-6 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <form action="{{ $currentUrl }}/{{ $character->id }}/relation/add" method="POST" class="flex flex-col sm:flex-row gap-3 items-end sm:items-center">
+                    
+                    <div class="w-full sm:w-auto">
+                        <label class="block text-xs font-bold text-gray-500 mb-1">대상</label>
+                        <select id="otherChar-select" name="to_char_id" class="w-full text-sm border-gray-300 rounded focus:ring-indigo-500" required>
+                            <option value="">캐릭터 선택</option>
+                            @foreach($otherCharacters as $char)
+                                <option value="{{ $char->id }}">{{ $char->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="w-24 flex-shrink-0">
+                        <label class="block text-xs font-bold text-gray-500 mb-1">호감도(-5~5)</label>
+                        <input type="number" name="favor" value="0" min="-5" max="5" class="w-full text-sm border-gray-300 rounded focus:ring-indigo-500">
+                    </div>
+
+                    <div class="flex-1 w-full">
+                        <label class="block text-xs font-bold text-gray-500 mb-1">관계 설명 (HTML 가능)</label>
+                        <textarea name="relation_text" placeholder="예: <b>짝사랑</b>. 몰래 지켜봄." class="w-full text-sm border-gray-300 rounded focus:ring-indigo-500" required></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full sm:w-auto bg-indigo-600 text-white text-sm px-4 py-2 rounded hover:bg-indigo-700 font-bold h-9 mt-auto">
+                        추가
+                    </button>
+                </form>
+            </div>
+            @endif
+        </div>
+
+        <div class="mt-8 text-center">
+            <a href="{{ $currentUrl }}" class="inline-block bg-gray-100 text-gray-600 px-6 py-2 rounded-full font-bold hover:bg-gray-200">
+                목록으로 돌아가기
+            </a>
+        </div>
+    </div>
+</div>
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        new TomSelect("#otherChar-select", {
+            create: false,
+            sortField: {
+                field: "text",
+                direction: "asc"
+            },
+            placeholder: "캐릭터 이름을 입력하세요...",
+            plugins: ['clear_button'],
+        });
+    });
+</script>
+@if(isset($_SESSION['user_idx']) && $_SESSION['user_idx'] == $character->user_id)
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var el = document.getElementById('relation-list');
+    
+    if(el) {
+        var sortable = Sortable.create(el, {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'bg-indigo-50',
+            onEnd: function (evt) {
+                var order = sortable.toArray(); 
+                fetch("{{ $currentUrl }}/{{ $character->id }}/relation/reorder", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        order: order
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        console.log('순서 저장 완료');
+                    } else {
+                        alert('순서 저장에 실패했습니다.');
+                    }
+                });
+            }
+        });
+    }
+});
+</script>
+@endif
+@endpush
+
+
+@endsection

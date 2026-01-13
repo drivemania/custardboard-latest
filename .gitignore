@@ -1,0 +1,6 @@
+/cache/*
+!/cache/.gitignore
+.env
+.DS_Store
+/public/data/*
+!/public/data/.gitignore

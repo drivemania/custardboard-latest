@@ -1,0 +1,7 @@
+{
+    "id": "hocho-diceroll",
+    "name": "댓글 주사위 굴림",
+    "version": "1.0.0",
+    "author": "LH커뮤공사",
+    "description": "댓글에 /주사위 를 입력하면 주사위를 굴릴수 있게 합니다."
+}

@@ -1,0 +1,229 @@
+
+.hc-menu-list {
+    display: flex;       /* 가로 배치 */
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    gap: 20px;           /* 메뉴 간격 */
+}
+.hc-menu-link {
+    text-decoration: none;
+    font-weight: bold;
+    color: #374151;      /* 기본 색상 */
+    font-size: 16px;
+}
+.hc-menu-link:hover, .hc-menu-item.active .hc-menu-link {
+    color: #2563EB;      /* 호버/활성 색상 (파랑) */
+}
+
+/* [2] 로그인 위젯 디자인 */
+.hc-login-widget {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    background-color: #f9fafb;
+    font-size: 14px;
+}
+
+/* 로그인 상태 */
+.hc-login-info { margin-bottom: 10px; text-align: center;}
+.hc-login-nickname { font-weight: bold; color: #2563EB; }
+.hc-login-actions a {
+    margin-right: 8px;
+    text-decoration: none;
+    color: #6b7280;
+}
+.hc-login-actions a:hover { text-decoration: underline; }
+
+/* 비로그인 상태 */
+.hc-login-inputs input {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    box-sizing: border-box; /* width:100% 사용시 필수 */
+}
+.hc-login-btn-submit {
+    width: 100%;
+    padding: 8px;
+    background-color: #2563EB;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.hc-login-btn-submit:hover { background-color: #1d4ed8; }
+.hc-login-links {
+    margin-top: 10px;
+    text-align: center;
+}
+.hc-login-link-register {
+    color: #6b7280;
+    text-decoration: none;
+    font-size: 12px;
+}
+/* 쪽지 알림 */
+.hc-memo-alert { text-align: right; margin-bottom: 10px; }
+.hc-memo-link { font-size: 12px; color: #666; text-decoration: none; }
+.hc-memo-badge { background: #ff0000; color: #fff; padding: 2px 5px; border-radius: 10px; font-size: 10px; margin-left: 4px; }
+
+/* 대표 캐릭터 영역 */
+.hc-main-char { display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; }
+
+/* 캐릭터 이미지 (원형) */
+.hc-main-char-img { width: 80px; height: 80px; border-radius: 50%; overflow: hidden; border: 2px solid #ddd; margin-bottom: 8px; }
+.hc-main-char-img img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 캐릭터 이름 */
+.hc-main-char-text { text-align: center; }
+.hc-main-char-name { display: block; font-weight: bold; font-size: 16px; color: #333; }
+.hc-main-char-role { display: block; font-size: 11px; color: #999; margin-top: 2px; }
+
+/* 캐릭터 없을 때 아이콘 */
+.hc-no-char { text-align: center; margin-bottom: 15px; }
+.hc-no-char-icon { width: 60px; height: 60px; background: #f0f0f0; border-radius: 50%; margin: 0 auto; line-height: 60px; font-size: 24px; }
+
+/* 버튼 그룹 */
+.hc-login-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.hc-login-btn-admin { grid-column: span 2; background: #333; color: #fff; text-align: center; padding: 5px; border-radius: 4px; font-size: 12px; }
+.hc-login-btn-logout, .hc-login-btn-info { border: 1px solid #ddd; color: #666; text-align: center; padding: 5px; border-radius: 4px; font-size: 12px; }
+
+.hc-latest-widget {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+/* 위젯 제목 */
+.hc-latest-title {
+    font-size: 16px;
+    font-weight: bold;
+    border-bottom: 2px solid #333;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+/* 목록 (ul) */
+.hc-latest-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* 목록 아이템 (li) */
+.hc-latest-item {
+    display: flex; /* 좌우 배치 */
+    justify-content: space-between; /* 양 끝 정렬 */
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+}
+
+/* 마지막 줄은 선 없애기 */
+.hc-latest-item:last-child {
+    border-bottom: none;
+}
+
+/* 왼쪽 영역 (뱃지 + 제목) */
+.hc-latest-left {
+    display: flex;
+    align-items: center;
+    overflow: hidden; /* 제목 길면 자르기용 */
+}
+
+/* 글/댓글 뱃지 */
+.hc-latest-badge-doc {
+    background: #eef2ff;
+    color: #4f46e5;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    margin-right: 6px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.hc-latest-badge-cmt {
+    background: #fdf2f8;
+    color: #db2777;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    margin-right: 6px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+/* 제목 링크 */
+.hc-latest-subject {
+    color: #333;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 200px; /* 상황에 따라 조절 */
+    transition: color 0.2s;
+}
+
+.hc-latest-subject:hover {
+    color: #4f46e5;
+    text-decoration: underline;
+}
+
+/* 새 글 아이콘 (N) */
+.hc-latest-new {
+    background: #ef4444;
+    color: #fff;
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-left: 5px;
+}
+
+/* 날짜 */
+.hc-latest-date {
+    font-size: 12px;
+    color: #999;
+    white-space: nowrap;
+    margin-left: 10px;
+}
+
+/* 글이 없을 때 */
+.hc-latest-empty {
+    text-align: center;
+    color: #999;
+    padding: 20px 0;
+}
+
+/* 자동 생성된 링크 스타일 */
+.hc-auto-link {
+    color: #0066cc; /* 진한 파란색 (원하는 색으로 변경 가능) */
+    text-decoration: underline; /* 밑줄 */
+    font-weight: bold;
+    word-break: break-all; /* 주소가 너무 길면 줄바꿈 */
+}
+
+.hc-auto-link:hover {
+    color: #003366; /* 마우스 올렸을 때 더 진하게 */
+    text-decoration: none; /* 밑줄 없애기 등 */
+}
+
+/* 해시태그 스타일 */
+.hc-hashtag {
+    color: #e11d48; /* 붉은 장미색 (원하는 색으로 변경) */
+    font-weight: bold;
+    text-decoration: none;
+    margin-right: 2px;
+}
+
+.hc-hashtag:hover {
+    text-decoration: underline;
+    opacity: 0.8;
+}
