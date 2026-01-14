@@ -2,9 +2,10 @@
 namespace App\Services;
 
 class VersionService {
-    const CURRENT_VERSION = '0.0.2';
+    const CURRENT_VERSION = '0.4.0';
+    const CURRENT_CODENAME = 'Cinnamon';
     
-    const UPDATE_URL = 'https://drivemania.github.io/hochoboard-doc/version.json';
+    const UPDATE_URL = 'https://drivemania.github.io/custardboard-doc/version.json';
     
     private $cacheFile;
 
@@ -26,7 +27,6 @@ class VersionService {
         $data = json_decode(file_get_contents($this->cacheFile), true);
         if (!$data || !isset($data['checked_at'])) return false;
 
-        // 현재시간 - 체크시간 < 86400초(24시간)
         return (time() - $data['checked_at']) < 86400;
     }
 
@@ -36,11 +36,18 @@ class VersionService {
     }
 
     private function fetchFromRemote() {
-        $ctx = stream_context_create(['http' => ['timeout' => 2]]);
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, self::UPDATE_URL);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+
+        $json = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
         
-        $json = @file_get_contents(self::UPDATE_URL, false, $ctx);
-        
-        if ($json === false) {
+        if ($json === false || $httpCode !== 200) {
             return ['has_update' => false, 'error' => '서버 연결 실패'];
         }
 
@@ -66,7 +73,9 @@ class VersionService {
         return [
             'has_update'     => $hasUpdate,
             'current_version'=> self::CURRENT_VERSION,
+            'current_codename'=> self::CURRENT_CODENAME,
             'latest_version' => $remoteData['latest_version'],
+            'latest_codename'=> $remoteData['latest_codename'],
             'message'        => $remoteData['message'] ?? '',
             'link'           => $remoteData['download_url'] ?? '#',
             'importance'     => $remoteData['importance'] ?? 'normal'

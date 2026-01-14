@@ -84,10 +84,14 @@ class InstallerController {
 
         return renderInstallView($response, 'step4');
     }
+
     public function runInstall($request, $response) {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
+
+        set_time_limit(0);
+        ini_set('memory_limit', '512M');
 
         $adminData = $request->getParsedBody();
 
@@ -96,12 +100,11 @@ class InstallerController {
         if (!$dbData) {
             return renderInstallView($response, 'step4', ['error' => '세션이 만료되었습니다. 처음부터 다시 시도해주세요.']);
         }
-
         $data = array_merge($dbData, $adminData);
-        $prefix = $data['db_prefix'] ?? 'hc_';
+        $prefix = $data['db_prefix'] ?? 'cu_';
 
         try {
-            $dsn = "mysql:host={$data['db_host']};dbname={$data['db_name']};charset=utf8mb4";
+            $dsn = "mysql:host={$data['db_host']};port={$data['db_port']};dbname={$data['db_name']};charset=utf8mb4";
             $pdo = new PDO($dsn, $data['db_user'], $data['db_pass']);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
@@ -112,9 +115,11 @@ class InstallerController {
                 $pdo->exec($finalSql);
             }
 
+
             $stmt = $pdo->prepare("INSERT INTO {$prefix}users (user_id, password, nickname, level, created_at) VALUES (?, ?, ?, ?, NOW())");
             $hashedPw = password_hash($data['admin_pw'], PASSWORD_DEFAULT);
             $stmt->execute([$data['admin_id'], $hashedPw, '관리자', 10]);
+
 
             $stmtGroup = $pdo->prepare("INSERT INTO {$prefix}groups (slug, name, is_default, created_at) VALUES (?, ?, 1, NOW())");
             $stmtGroup->execute([
@@ -122,7 +127,9 @@ class InstallerController {
                 $adminData['group_name']
             ]);
 
+
             $this->createEnvFile($data);
+
 
             unset($_SESSION['install_data']); 
             

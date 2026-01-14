@@ -12,7 +12,7 @@
                 x-transition:enter-start="opacity-0 scale-95"
                 x-transition:enter-end="opacity-100 scale-100"
                 class="absolute inset-0 w-full h-full">
-                <a href="#"><img src="{{ $themeUrl }}/image/banner1.png" class="w-full h-full object-cover" alt="Slide 1"></a>
+                <a href="#"><img src="{{ $themeUrl }}/image/banner1.png?v={{ date("YmdHis") }}" class="w-full h-full object-cover" alt="Slide 1"></a>
             </div>
         </div>
 
@@ -35,32 +35,31 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        @hc_latestPost(5, 20, $group->slug)
+        @custard_latestPost(5, 20, [], [$group->slug])
 
-        @hc_login($group->slug)
+        @custard_login($group->slug)
     </div>
 
-@push('scripts')
 <script>
-    function imageSlider() {
+    window.imageSlider = function() {
         return {
             active: 0, // 몇번째 슬라이드를 먼저 보여주고 싶은지 지정하시면 됩니다
             total: 1, // 전체 슬라이드 개수
             interval: null,
-    
+
             startAutoPlay() {
                 this.interval = setInterval(() => {
                     this.next();
                 }, 3000); // 1000 = 1초
             },
-    
+
             stopAutoPlay() { clearInterval(this.interval); },
-    
+
             next() { this.active = (this.active + 1) % this.total; },
-    
+
             prev() { this.active = (this.active - 1 + this.total) % this.total; }
         }
+
     }
 </script>
-@endpush
 @endsection

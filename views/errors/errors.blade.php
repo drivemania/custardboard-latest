@@ -12,7 +12,7 @@
     </style>
 </head>
 <body>
-    <h1>404</h1>
+    <h1>{{ $code }}</h1>
     <h2>{{ $title }}</h2>
     <p>{{ $errorMessage }}</p>
     <br>

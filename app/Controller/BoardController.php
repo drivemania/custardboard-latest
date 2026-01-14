@@ -3,9 +3,10 @@ namespace App\Controller;
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Capsule\Manager as DB;
 
-class BoardController
+class BoardController extends Model
 {
     protected $blade;
     protected $basePath;
@@ -82,7 +83,7 @@ class BoardController
             return $response;
         }
         
-        if (in_array($menuSlug, ['admin', 'login', 'logout', 'register', 'au', 'comment', 'memo'])) {
+        if (in_array($menuSlug, ['admin', 'login', 'logout', 'register', 'au', 'comment', 'page', 'memo', 'plugin', 'shop'])) {
             $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다.";
             $_SESSION['flash_type'] = 'error';
             return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
@@ -114,6 +115,11 @@ class BoardController
             $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다.";
             $_SESSION['flash_type'] = 'error';
             return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
+        }
+
+        //만약 접속한 사람이 회원이 아니거나 0레벨인 경우 비밀글 사용 불가
+        if(!isset($_SESSION['user_idx']) || $_SESSION['user_idx'] < 1){
+            $board->use_secret = 0;
         }
 
         $currentUrl = $this->basePath . '/au/' . $group->slug . '/' . $menu->slug;
@@ -157,23 +163,106 @@ class BoardController
                 
                 //상세보기
                 if (is_numeric($action)) {
-                    $docId = $action;
+                    $docNum = $action;
                     
-                    $document = DB::table('documents')->find($docId);
+                    // $document = DB::table('documents')->where('board_id', $board->id)->where('doc_num', $docNum)->first();
+                    $document = DB::table('documents')
+                        ->where('documents.board_id', $board->id)
+                        ->where('documents.doc_num', $docNum)
+                        
+                        ->leftJoin('characters', function($join) use ($group) {
+                            $join->on('documents.user_id', '=', 'characters.user_id')
+                                ->where('characters.group_id', '=', $group->id)
+                                ->where('characters.is_main', '=', 1);
+                        })
+                        
+                        ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
+                        ->leftJoin('menus as char_menu', function($join) use ($group) {
+                            $join->on('characters.board_id', '=', 'char_menu.target_id')
+                                ->where('char_menu.type', '=', 'character')
+                                ->where('char_menu.group_id', '=', $group->id)
+                                ->where('char_menu.is_deleted', '=', 0);
+                        })
+                        
+                        ->leftJoin('character_titles', function($join) {
+                            $join->on('characters.id', '=', 'character_titles.character_id')
+                                ->where('character_titles.is_display', '=', 1);
+                        })
+                        
+                        ->leftJoin('titles', 'character_titles.title_id', '=', 'titles.id')
+                        
+                        ->select([
+                            'documents.*',
+                            'characters.id as char_id',
+                            'characters.image_path as char_image',
+                            'characters.name as char_name',
+                            'char_group.slug as char_group_slug',
+                            'char_menu.slug as char_menu_slug',
+                            
+                            'titles.icon_path as title_icon',
+                            'titles.name as title_name'
+                        ])
+                        ->first();
+                    
                     if (!$document || $document->is_deleted == 1) {
                         $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다.";
                         $_SESSION['flash_type'] = 'error';
                         return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
                     }
+
+                    if ($document->is_secret > 0 && $document->user_id != $_SESSION['user_idx'] && $_SESSION['level'] < 10) {
+                        $_SESSION['flash_message'] = "권한이 없습니다.";
+                        $_SESSION['flash_type'] = 'error';
+                        return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
+                    }
+
+                    $docId = $document->id;
         
                     DB::table('documents')->where('id', $docId)->increment('hit');
         
+                    $prefix = DB::connection()->getTablePrefix();
                     $comments = DB::table('comments')
-                        ->where('doc_id', $docId)
-                        ->where('is_deleted', 0)
-                        ->orderBy('id', 'asc')
-                        ->get();
-        
+                    ->leftJoin('characters', function($join) use ($group) {
+                        $join->on('comments.user_id', '=', 'characters.user_id')
+                            ->where('characters.group_id', '=', $group->id)
+                            ->where('characters.is_main', '=', 1);
+                    })
+                    ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
+                    ->leftJoin('menus as char_menu', function($join) use ($group) {
+                        $join->on('characters.board_id', '=', 'char_menu.target_id')
+                            ->where('char_menu.type', '=', 'character')
+                            ->where('char_menu.group_id', '=', $group->id)
+                            ->where('char_menu.is_deleted', '=', 0);
+                    })
+                    ->leftJoin('character_titles', function($join) {
+                        $join->on('characters.id', '=', 'character_titles.character_id')
+                             ->where('character_titles.is_display', '=', 1);
+                    })
+                    ->leftJoin('titles', 'character_titles.title_id', '=', 'titles.id')
+                    
+                    ->where('comments.doc_id', $docId)
+                    ->where('comments.is_deleted', 0)
+                    
+                    ->orderByRaw("IF(COALESCE({$prefix}comments.parent_id, 0) = 0, {$prefix}comments.id, {$prefix}comments.parent_id) ASC")
+                    ->orderBy('comments.id', 'asc')
+                    ->select([
+                        'comments.*',
+                        'characters.id as char_id',
+                        'characters.image_path as char_image',
+                        'characters.name as char_name',
+                        'char_group.slug as char_group_slug',
+                        'char_menu.slug as char_menu_slug',
+                        'titles.icon_path as title_icon',
+                        'titles.name as title_name'
+                    ])
+                    ->get();
+
+                    if(!empty($comments)){
+                        foreach($comments as $cmt){
+                            $cmt->plugin = $this->getPluginId('comment', $cmt->id);
+                        }
+                    }
+
                     $skinView = 'board.' . ($board->board_skin ?? 'basic') . '.view';
                     $listUrl = $currentUrl; // 목록 주소
         
@@ -185,7 +274,7 @@ class BoardController
                     ->get();
 
                     foreach ($emoticon as $emo) {
-                        $imgTag = '<img src="'.$this->basePath . $emo->image_path . '" alt="'.$emo->code.'" class="hc-emoticon" style="display:inline-block; vertical-align:middle;">';
+                        $imgTag = '<img src="'.$this->basePath . $emo->image_path . '" alt="'.$emo->code.'" class="custard-emoticon" style="display:inline-block; vertical-align:middle;">';
                         $document->content = str_replace($emo->code, $imgTag, $document->content);
                         foreach ($comments as $cmt) {
                             $cmt->content = str_replace($emo->code, $imgTag, $cmt->content);
@@ -193,7 +282,8 @@ class BoardController
                     }
                     
                     $document->content = \App\Support\Hook::filter('post_content', $document->content);
-        
+                    $document->plugin =  $this->getPluginId('document', $document->id);
+
                     $content = $this->blade->render($skinView, [
                         'themeLayout' => $themeLayout,
                         'themeUrl'    => $themeUrl,
@@ -204,7 +294,7 @@ class BoardController
                         'menu'        => $menu,
                         'document'    => $document,
                         'comments'    => $comments,
-                        'currentUrl'  => $currentUrl . '/' . $docId, // 현재 글 주소
+                        'currentUrl'  => $currentUrl . '/' . $docNum, // 현재 글 주소
                         'listUrl'     => $listUrl
                     ]);
                     $response->getBody()->write($content);
@@ -225,9 +315,10 @@ class BoardController
                             ->where('characters.is_main', '=', 1);
                     })
                     ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
-                    ->leftJoin('menus as char_menu', function($join) {
+                    ->leftJoin('menus as char_menu', function($join) use ($group) {
                         $join->on('characters.board_id', '=', 'char_menu.target_id')
                             ->where('char_menu.type', '=', 'character')
+                            ->where('char_menu.group_id', '=', $group->id)
                             ->where('char_menu.is_deleted', '=', 0);
                     })
                     ->where('documents.board_id', $board->id)
@@ -271,45 +362,104 @@ class BoardController
                     }
                 }
         
-                $documents = $query->orderBy('documents.is_notice', 'desc')
-                    ->orderBy('documents.id', 'desc')
-                    ->paginate($perPage, [
-                        'documents.*',
+                $documents = $query->leftJoin('character_titles', function($join) {
+                    $join->on('characters.id', '=', 'character_titles.character_id')
+                         ->where('character_titles.is_display', '=', 1);
+                })
+                ->leftJoin('titles', 'character_titles.title_id', '=', 'titles.id')
+                
+                ->orderBy('documents.is_notice', 'desc')
+                ->orderBy('documents.id', 'desc')
+                ->paginate($perPage, [
+                    'documents.*',
+                    'characters.id as char_id',
+                    'characters.image_path as char_image',
+                    'characters.name as char_name',
+                    'char_group.slug as char_group_slug',
+                    'char_menu.slug as char_menu_slug',
+                    
+                    'titles.icon_path as title_icon',
+                    'titles.name as title_name'
+                ], 'page', $page);
+        
+                $skinView = 'board.' . ($board->board_skin ?? 'basic') . '.list';
+
+                $prefix = DB::connection()->getTablePrefix();
+
+                $emoticon = DB::table('emoticons')->get();
+
+                foreach ($documents as $doc) {
+                    // $doc->comments = DB::table('comments')
+                    //     ->leftJoin('characters', function($join) use ($group) {
+                    //         $join->on('comments.user_id', '=', 'characters.user_id')
+                    //             ->where('characters.group_id', '=', $group->id)
+                    //             ->where('characters.is_main', '=', 1);
+                    //     })
+                    //     ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
+                    //     ->leftJoin('menus as char_menu', function($join) use ($group) {
+                    //         $join->on('characters.board_id', '=', 'char_menu.target_id')
+                    //             ->where('char_menu.type', '=', 'character')
+                    //             ->where('char_menu.group_id', '=', $group->id)
+                    //             ->where('char_menu.is_deleted', '=', 0);
+                    //     })
+                    //     ->where('comments.doc_id', $doc->id)
+                    //     ->where('comments.is_deleted', 0)
+                    //     ->orderByRaw("IF(COALESCE({$prefix}comments.parent_id, 0) = 0, {$prefix}comments.id, {$prefix}comments.parent_id) ASC")
+                    //     ->orderBy('comments.id', 'asc')
+                    //     ->select([
+                    //         'comments.*',
+                    //         'characters.id as char_id',
+                    //         'characters.image_path as char_image',
+                    //         'characters.name as char_name',
+                    //         'char_group.slug as char_group_slug',
+                    //         'char_menu.slug as char_menu_slug'
+                    //     ])
+                    //     ->get();
+
+                    $doc->comments = DB::table('comments')
+                    ->leftJoin('characters', function($join) use ($group) {
+                        $join->on('comments.user_id', '=', 'characters.user_id')
+                            ->where('characters.group_id', '=', $group->id)
+                            ->where('characters.is_main', '=', 1);
+                    })
+                    ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
+                    ->leftJoin('menus as char_menu', function($join) use ($group) {
+                        $join->on('characters.board_id', '=', 'char_menu.target_id')
+                            ->where('char_menu.type', '=', 'character')
+                            ->where('char_menu.group_id', '=', $group->id)
+                            ->where('char_menu.is_deleted', '=', 0);
+                    })
+                    ->leftJoin('character_titles', function($join) {
+                        $join->on('characters.id', '=', 'character_titles.character_id')
+                             ->where('character_titles.is_display', '=', 1);
+                    })
+                    ->leftJoin('titles', 'character_titles.title_id', '=', 'titles.id')
+                    
+                    ->where('comments.doc_id', $doc->id)
+                    ->where('comments.is_deleted', 0)
+                    
+                    ->orderByRaw("IF(COALESCE({$prefix}comments.parent_id, 0) = 0, {$prefix}comments.id, {$prefix}comments.parent_id) ASC")
+                    ->orderBy('comments.id', 'asc')
+                    ->select([
+                        'comments.*',
                         'characters.id as char_id',
                         'characters.image_path as char_image',
                         'characters.name as char_name',
                         'char_group.slug as char_group_slug',
-                        'char_menu.slug as char_menu_slug'
-                    ], 'page', $page);
-        
-                $skinView = 'board.' . ($board->board_skin ?? 'basic') . '.list';
-        
-                foreach ($documents as $doc) {
-                    $doc->comments = DB::table('comments')
-                        ->leftJoin('characters', function($join) use ($group) {
-                            $join->on('comments.user_id', '=', 'characters.user_id')
-                                ->where('characters.group_id', '=', $group->id)
-                                ->where('characters.is_main', '=', 1);
-                        })
-                        ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
-                        ->leftJoin('menus as char_menu', function($join) {
-                            $join->on('characters.board_id', '=', 'char_menu.target_id')
-                                ->where('char_menu.type', '=', 'character')
-                                ->where('char_menu.is_deleted', '=', 0);
-                        })
-                        ->where('comments.doc_id', $doc->id)
-                        ->where('comments.is_deleted', 0)
-                        ->orderBy('comments.created_at', 'asc')
-                        ->select([
-                            'comments.*',
-                            'characters.id as char_id',
-                            'characters.image_path as char_image',
-                            'characters.name as char_name',
-                            'char_group.slug as char_group_slug',
-                            'char_menu.slug as char_menu_slug'
-                        ])
-                        ->get();
+                        'char_menu.slug as char_menu_slug',
+                        'titles.icon_path as title_icon',
+                        'titles.name as title_name'
+                    ])
+                    ->get();
+
+                    foreach ($emoticon as $emo) {
+                        $imgTag = '<img src="'.$this->basePath . $emo->image_path . '" alt="'.$emo->code.'" class="custard-emoticon" style="display:inline-block; vertical-align:middle;">';
+                        foreach ($doc->comments as $cmt) {
+                            $cmt->content = str_replace($emo->code, $imgTag, $cmt->content);
+                        }
+                    }
                 }
+
 
                 $parser = new \ContentParser($this->basePath); 
                 $board->notice = $parser->parse($board->notice);
@@ -360,6 +510,7 @@ class BoardController
                         'themeUrl' => $themeUrl,
                         'skinUrl' => $skinUrl,
                         'group' => $group,
+                        'board'  => $board,
                         'mode' => 'create',
                         'mainUrl' => $mainUrl,
                         'character' => null,
@@ -410,26 +561,82 @@ class BoardController
 
                     }
 
+                    $inventory = DB::table('character_items')
+                    ->join('items', 'character_items.item_id', '=', 'items.id')
+                    ->where('character_items.character_id', $charId)
+                    ->where('items.is_deleted', 0)
+                    ->where('character_items.quantity', '>', 0)
+                    ->where('character_items.is_deleted', 0)
+                    ->select([
+                        'character_items.id as inventory_id',
+                        'character_items.quantity',
+                        'character_items.comment',
+                        'items.id as item_id',
+                        'items.name',
+                        'items.description',
+                        'items.icon_path',
+                        'items.effect_type',
+                        'items.is_sellable',
+                        'items.is_permanent',
+                        'items.is_binding',
+                        'items.sell_price'
+                    ])
+                    ->get();
+
+                    $titles = DB::table('character_titles')
+                    ->join('titles', 'character_titles.title_id', '=', 'titles.id')
+                    ->where('character_titles.character_id', $charId)
+                    ->where('titles.is_deleted', 0)
+                    ->where('character_titles.is_deleted', 0)
+                    ->select([
+                        'character_titles.id as list_id',
+                        'titles.id as id',
+                        'titles.name',
+                        'titles.description',
+                        'titles.icon_path',
+                        'character_titles.is_display'
+                    ])
+                    ->get();
+
                     $otherCharacters = DB::table('characters')
                         ->where('group_id', $character->group_id)
                         ->where('is_deleted', 0)
                         ->whereNotIn('id', $targetIds)
                         ->orderBy('name', 'asc')
                         ->get();
+
+                    $giftCharacters = DB::table('characters')
+                        ->where('group_id', $character->group_id)
+                        ->where('is_deleted', 0)
+                        ->where('id', "!=", $character->id)
+                        ->orderBy('name', 'asc')
+                        ->get();
                     
-                    $owner = DB::table('users')->find($character->user_id);
-        
+                    $owner = DB::table('users')
+                        ->leftJoin('groups', function($join) use ($character) {
+                            $join->where('groups.id', '=', $character->group_id);
+                        })
+                        ->where('users.id', $character->user_id)
+                        ->select('users.*', 'groups.point_name')
+                        ->first();
+                    $point = $owner->user_point ." ". $owner->point_name;
+                    
                     $content = $this->blade->render($skinViewPath . '.view', [
                         'themeLayout' => $themeLayout,
                         'themeUrl' => $themeUrl,
                         'mainUrl' => $mainUrl,
                         'skinUrl' => $skinUrl,
                         'group' => $group,
+                        'board'  => $board,
                         'character' => $character,
+                        'inventory' => $inventory,
+                        'titles' => $titles,
                         'owner' => $owner ? $owner->nickname : '알수없음',
-                        'profile' => json_decode($character->profile_data, true) ?? [],
+                        'point' => $point,
+                        'profile' => $character->profile_data ? json_decode($character->profile_data, associative: true) : [],
                         'relations' => $finalRelations,
                         'otherCharacters' => $otherCharacters,
+                        'giftCharacters' => $giftCharacters,
                         'currentUrl' => $currentUrl
                     ]);
                     $response->getBody()->write($content);
@@ -453,6 +660,7 @@ class BoardController
                     'skinUrl' => $skinUrl,
                     'mainUrl' => $mainUrl,
                     'group' => $group,
+                    'board'       => $board,
                     'characters' => $characters,
                     'title' => $menu->title,
                     'currentUrl' => $currentUrl
@@ -479,16 +687,18 @@ class BoardController
                     $docId = $action;
                     
                     $document = DB::table('documents')
-                    ->where('documents.id', $docId)
+                    ->where('documents.board_id', $board->id)
+                    ->where('documents.doc_num', $docId)
                     ->where('documents.is_deleted', 0)
                     ->leftJoin('characters', function($join) use ($group) {
                         $join->on('documents.user_id', '=', 'characters.user_id')
                              ->where('characters.group_id', '=', $group->id)
                              ->where('characters.is_main', '=', 1);
                     })
-                    ->leftJoin('menus as char_menu', function($join) {
+                    ->leftJoin('menus as char_menu', function($join) use ($group) {
                         $join->on('characters.board_id', '=', 'char_menu.target_id')
                              ->where('char_menu.type', '=', 'character')
+                             ->where('char_menu.group_id', '=', $group->id)
                              ->where('char_menu.is_deleted', '=', 0);
                     })
                     ->orderBy('documents.is_notice', 'desc')
@@ -508,30 +718,46 @@ class BoardController
                         return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
                     }
         
-                    DB::table('documents')->where('id', $docId)->increment('hit');
+                    DB::table('documents')->where('doc_num', $docId)->increment('hit');
+                    $prefix = DB::connection()->getTablePrefix();
 
                     $comments = DB::table('comments')
-                        ->where('comments.doc_id', $docId)
+                        ->where('comments.doc_id', $document->id)
                         ->where('comments.is_deleted', 0)
                         ->leftJoin('characters', function($join) use ($group) {
                             $join->on('comments.user_id', '=', 'characters.user_id')
                                 ->where('characters.group_id', '=', $group->id)
                                 ->where('characters.is_main', '=', 1);
                         })
-                        ->leftJoin('menus as char_menu', function($join) {
+                        ->leftJoin('menus as char_menu', function($join) use ($group) {
                             $join->on('characters.board_id', '=', 'char_menu.target_id')
                                 ->where('char_menu.type', '=', 'character')
+                                ->where('char_menu.group_id', '=', $group->id)
                                 ->where('char_menu.is_deleted', '=', 0);
                         })
-                        ->orderBy('comments.created_at', 'asc')
+                        ->leftJoin('character_titles', function($join) {
+                            $join->on('characters.id', '=', 'character_titles.character_id')
+                                 ->where('character_titles.is_display', '=', 1);
+                        })
+                        ->leftJoin('titles', 'character_titles.title_id', '=', 'titles.id')
+                        ->orderByRaw("IF(COALESCE({$prefix}comments.parent_id, 0) = 0, {$prefix}comments.id, {$prefix}comments.parent_id) ASC")
+                        ->orderBy('comments.id', 'asc')
                         ->select([
                             'comments.*',
                             'characters.id as char_id',
                             'characters.image_path as char_image',
                             'characters.name as char_name',
                             'char_menu.slug as char_menu_slug',
+                            'titles.icon_path as title_icon',
+                            'titles.name as title_name'
                         ])
                         ->get();
+
+                    if(!empty($comments)){
+                        foreach($comments as $cmt){
+                            $cmt->plugin = $this->getPluginId('comment', $cmt->id);
+                        }
+                    }
         
                     $skinView = 'load.' . ($board->board_skin ?? 'basic') . '.view';
                     $listUrl = $currentUrl; // 목록 주소
@@ -543,8 +769,10 @@ class BoardController
                     $emoticon = DB::table('emoticons')
                     ->get();
 
+                    $document->plugin =  $this->getPluginId('document', $document->id);
+
                     foreach ($emoticon as $emo) {
-                        $imgTag = '<img src="'.$this->basePath . $emo->image_path . '" alt="'.$emo->code.'" class="hc-emoticon" style="display:inline-block; vertical-align:middle;">';
+                        $imgTag = '<img src="'.$this->basePath . $emo->image_path . '" alt="'.$emo->code.'" class="custard-emoticon" style="display:inline-block; vertical-align:middle;">';
                         $document->content = str_replace($emo->code, $imgTag, $document->content);
                         foreach ($comments as $cmt) {
                             $cmt->content = str_replace($emo->code, $imgTag, $cmt->content);
@@ -581,9 +809,10 @@ class BoardController
                             ->where('characters.is_main', '=', 1);
                     })
                     ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
-                    ->leftJoin('menus as char_menu', function($join) {
+                    ->leftJoin('menus as char_menu', function($join) use ($group) {
                         $join->on('characters.board_id', '=', 'char_menu.target_id')
                             ->where('char_menu.type', '=', 'character')
+                            ->where('char_menu.group_id', '=', $group->id)
                             ->where('char_menu.is_deleted', '=', 0);
                     })
                     ->where('documents.board_id', $board->id)
@@ -598,11 +827,12 @@ class BoardController
                             $query->where('documents.nickname', 'like', "%{$keyword}%");
                             break;
                         case "anchor":
-                            $query->where('documents.id', '<=', $keyword);
+                            $query->where('documents.doc_num', '<=', $keyword);
                             break;
                         case "hashtag":
+                            $keyword = ltrim($keyword, '#');
                             $hashCmtArr = DB::table('comments')
-                                ->where('content', 'like', "%{$keyword}%")
+                                ->where('content', 'like', "%#{$keyword}%")
                                 ->where('is_deleted', '=', 0)
                                 ->pluck('doc_id')
                                 ->toArray();
@@ -629,39 +859,83 @@ class BoardController
 
                 $emoticon = DB::table('emoticons')
                 ->get();
+
+                $prefix = DB::connection()->getTablePrefix();
             
                 foreach ($documents as $doc) {
+                    // $doc->comments = DB::table('comments')
+                    //     ->leftJoin('characters', function($join) use ($group) {
+                    //         $join->on('comments.user_id', '=', 'characters.user_id')
+                    //             ->where('characters.group_id', '=', $group->id)
+                    //             ->where('characters.is_main', '=', 1);
+                    //     })
+                    //     ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
+                    //     ->leftJoin('menus as char_menu', function($join) use ($group) {
+                    //         $join->on('characters.board_id', '=', 'char_menu.target_id')
+                    //             ->where('char_menu.type', '=', 'character')
+                    //             ->where('char_menu.group_id', '=', $group->id)
+                    //             ->where('char_menu.is_deleted', '=', 0);
+                    //     })
+                    //     ->where('comments.doc_id', $doc->id)
+                    //     ->where('comments.is_deleted', 0)
+                    //     ->orderByRaw("IF(COALESCE({$prefix}comments.parent_id, 0) = 0, {$prefix}comments.id, {$prefix}comments.parent_id) ASC")
+                    //     ->orderBy('comments.id', 'asc')
+                    //     ->select([
+                    //         'comments.*',
+                    //         'characters.id as char_id',
+                    //         'characters.image_path as char_image',
+                    //         'characters.name as char_name',
+                    //         'char_group.slug as char_group_slug',
+                    //         'char_menu.slug as char_menu_slug'
+                    //     ])
+                    //     ->get();
+
                     $doc->comments = DB::table('comments')
-                        ->leftJoin('characters', function($join) use ($group) {
-                            $join->on('comments.user_id', '=', 'characters.user_id')
-                                ->where('characters.group_id', '=', $group->id)
-                                ->where('characters.is_main', '=', 1);
-                        })
-                        ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
-                        ->leftJoin('menus as char_menu', function($join) {
-                            $join->on('characters.board_id', '=', 'char_menu.target_id')
-                                ->where('char_menu.type', '=', 'character')
-                                ->where('char_menu.is_deleted', '=', 0);
-                        })
-                        ->where('comments.doc_id', $doc->id)
-                        ->where('comments.is_deleted', 0)
-                        ->orderBy('comments.created_at', 'asc')
-                        ->select([
-                            'comments.*',
-                            'characters.id as char_id',
-                            'characters.image_path as char_image',
-                            'characters.name as char_name',
-                            'char_group.slug as char_group_slug',
-                            'char_menu.slug as char_menu_slug'
-                        ])
-                        ->get();
+                    ->leftJoin('characters', function($join) use ($group) {
+                        $join->on('comments.user_id', '=', 'characters.user_id')
+                            ->where('characters.group_id', '=', $group->id)
+                            ->where('characters.is_main', '=', 1);
+                    })
+                    ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
+                    ->leftJoin('menus as char_menu', function($join) use ($group) {
+                        $join->on('characters.board_id', '=', 'char_menu.target_id')
+                            ->where('char_menu.type', '=', 'character')
+                            ->where('char_menu.group_id', '=', $group->id)
+                            ->where('char_menu.is_deleted', '=', 0);
+                    })
+                    ->leftJoin('character_titles', function($join) {
+                        $join->on('characters.id', '=', 'character_titles.character_id')
+                             ->where('character_titles.is_display', '=', 1);
+                    })
+                    ->leftJoin('titles', 'character_titles.title_id', '=', 'titles.id')
+                    
+                    ->where('comments.doc_id', $doc->id)
+                    ->where('comments.is_deleted', 0)
+                    
+                    ->orderByRaw("IF(COALESCE({$prefix}comments.parent_id, 0) = 0, {$prefix}comments.id, {$prefix}comments.parent_id) ASC")
+                    ->orderBy('comments.id', 'asc')
+                    ->select([
+                        'comments.*',
+                        'characters.id as char_id',
+                        'characters.image_path as char_image',
+                        'characters.name as char_name',
+                        'char_group.slug as char_group_slug',
+                        'char_menu.slug as char_menu_slug',
+                        'titles.icon_path as title_icon',
+                        'titles.name as title_name'
+                    ])
+                    ->get();
 
                     foreach ($emoticon as $emo) {
-                        $imgTag = '<img src="'.$this->basePath . $emo->image_path . '" alt="'.$emo->code.'" class="hc-emoticon" style="display:inline-block; vertical-align:middle;">';
+                        $imgTag = '<img src="'.$this->basePath . $emo->image_path . '" alt="'.$emo->code.'" class="custard-emoticon" style="display:inline-block; vertical-align:middle;">';
                         $doc->content = str_replace($emo->code, $imgTag, $doc->content);
                         foreach ($doc->comments as $cmt) {
                             $cmt->content = str_replace($emo->code, $imgTag, $cmt->content);
                         }
+                    }
+
+                    foreach($doc->comments as $cmt){
+                        $cmt->plugin = $this->getPluginId('comment', $cmt->id);
                     }
                 }
 
@@ -701,7 +975,7 @@ class BoardController
                 ->get();
 
                 foreach ($emoticon as $emo) {
-                    $imgTag = '<img src="'.$this->basePath . $emo->image_path . '" alt="'.$emo->code.'" class="hc-emoticon" style="display:inline-block; vertical-align:middle;">';
+                    $imgTag = '<img src="'.$this->basePath . $emo->image_path . '" alt="'.$emo->code.'" class="custard-emoticon" style="display:inline-block; vertical-align:middle;">';
                     $board->notice = str_replace($emo->code, $imgTag, $board->notice);
                 }
 
@@ -738,31 +1012,35 @@ class BoardController
             $this->returnUrl = "/$menuSlug";
         }
 
-
         if (!$group) {
-            $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다. 1";
+            $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다.";
             $_SESSION['flash_type'] = 'error';
             return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
         };
 
         $menu = DB::table('menus')->where('group_id', $group->id)->where('slug', $menuSlug)->first();
         if (!$menu || !in_array($menu->type, array('board', 'load'))) {
-            $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다. 2";
+            $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다.";
             $_SESSION['flash_type'] = 'error';
             return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
         };
 
         $board = DB::table('boards')->find($menu->target_id);
         if (!$board) {
-                $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다. 3";
-                $_SESSION['flash_type'] = 'error';
-                return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
-            };
+            $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다.";
+            $_SESSION['flash_type'] = 'error';
+            return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
+        };
+
+        //만약 접속한 사람이 회원이 아니거나 0레벨인 경우 비밀글 사용 불가
+        if(!isset($_SESSION['user_idx']) || $_SESSION['user_idx'] < 1){
+            $board->use_secret = 0;
+        }
 
         if( $board->type == "load" ) {
-            $result = saveLoadPost($request, $board, $menu);
+            $result = $this->saveLoadPost($request, $board, $menu);
         }else{
-            $result = savePost($request, $board, $menu);
+            $result = $this->savePost($request, $board, $menu);
         }
 
 
@@ -775,9 +1053,9 @@ class BoardController
         return $response->withHeader('Location', $this->basePath . $this->returnUrl)->withStatus(302);
     }
 
-    public function delete(Request $request, Response $response, $args) 
+    public function bdelete(Request $request, Response $response, $args) 
     {
-        $docId = $args['id'];
+        $docNum = $args['id'];
         $slug = $args['menu_slug'];
         $isShort = $args['is_short'] ?? false;
 
@@ -790,11 +1068,12 @@ class BoardController
 
 
         $boardType = $slugChk->type;
+        $boardId = $slugChk->target_id;
 
         switch($boardType){
             case 'load':
             case 'board':{
-                $check = DB::table(table: 'documents')->where('id',  $docId)->first();
+                $check = DB::table(table: 'documents')->where('board_id', $boardId)->where('doc_num',  $docNum)->first();
                 if (!$check) {
                     $_SESSION['flash_message'] = '처리중 오류가 발생했습니다.';
                     $_SESSION['flash_type'] = 'error';
@@ -802,15 +1081,24 @@ class BoardController
                 }
                 $myId = $_SESSION['user_idx'] ?? 0;
                 $myLevel = $_SESSION['level'] ?? 0;
+                
+                $board = DB::table(table: 'boards')->where('id', $boardId)->where('is_deleted', 0)->first();
             
                 if ($check->user_id != $myId && $myLevel < 10) {
                     $_SESSION['flash_message'] = '삭제 권한이 없습니다.';
                     $_SESSION['flash_type'] = 'error';
                     return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
                 }
+
+                if(($_SESSION['level'] ?? 0) < $board->edit_level) {
+                    $_SESSION['flash_message'] = '삭제 권한이 없습니다.';
+                    $_SESSION['flash_type'] = 'error';
+                    return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
+                }
             
                 DB::table('documents')
-                ->where('id', $docId)
+                ->where('doc_num', $docNum)
+                ->where('board_id', $boardId)
                 ->update([
                     'is_deleted' => 1,
                     'deleted_at' => date('Y-m-d H:i:s')
@@ -818,7 +1106,7 @@ class BoardController
                 break;
             }
             case 'character':{
-                $check = DB::table(table: 'characters')->where('id',  $docId)->first();
+                $check = DB::table(table: 'characters')->where('id',  $docNum)->first();
                 if (!$check) {
                     $_SESSION['flash_message'] = '처리중 오류가 발생했습니다.';
                     $_SESSION['flash_type'] = 'error';
@@ -826,7 +1114,15 @@ class BoardController
                 }
                 $myId = $_SESSION['user_idx'] ?? 0;
                 $myLevel = $_SESSION['level'] ?? 0;
-            
+
+                $board = DB::table(table: 'boards')->where('id', $boardId)->where('is_deleted', 0)->first();
+
+                if(($_SESSION['level'] ?? 0) < $board->edit_level) {
+                    $_SESSION['flash_message'] = '삭제 권한이 없습니다.';
+                    $_SESSION['flash_type'] = 'error';
+                    return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
+                }
+
                 if ($check->user_id != $myId && $myLevel < 10) {
                     $_SESSION['flash_message'] = '삭제 권한이 없습니다.';
                     $_SESSION['flash_type'] = 'error';
@@ -834,7 +1130,7 @@ class BoardController
                 }
             
                 DB::table('characters')
-                ->where('id', $docId)
+                ->where('id', $docNum)
                 ->update([
                     'is_deleted' => 1,
                     'deleted_at' => date('Y-m-d H:i:s')
@@ -852,51 +1148,22 @@ class BoardController
         return $response->withHeader('Location', $this->returnUrl)->withStatus(302);
     }
 
-    public function comment(Request $request, Response $response, $args) 
-    {
-        $docId = $args['id'];
-        $isShort = $args['is_short'] ?? false;
-        $data = $request->getParsedBody();
-        
-        $doc = DB::table('documents')->find($docId);
-        $board = DB::table('boards')->where('id', $doc->board_id)->where('is_deleted', 0)->first();
-
-        if (($_SESSION['level'] ?? 0) < $board->comment_level) {
-            $_SESSION['flash_message'] = '댓글 권한이 없습니다.';
-            $_SESSION['flash_type'] = 'error';
-            return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
-        }
-
-        $data = \App\Support\Hook::filter('before_comment_save', $data);
-    
-        DB::table('comments')->insert([
-            'board_id' => $doc->board_id,
-            'doc_id' => $docId,
-            'user_id' => $_SESSION['user_idx'] ?? 0,
-            'nickname' => $_SESSION['nickname'] ?? '손님',
-            'content' => trim(cleanHtml($data['content'])),
-            'ip_address' => $_SERVER['REMOTE_ADDR'],
-            'created_at' => date('Y-m-d H:i:s')
-        ]);
-
-        if($isShort){
-            $this->returnUrl = $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/';
-        }else{
-            $this->returnUrl = $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/'; //혹시모르니까
-        }
-    
-        DB::table('documents')->where('id', $docId)->increment('comment_count');
-    
-        return $response->withHeader('Location', $this->returnUrl)->withStatus(302);
-    }
-
     public function edit(Request $request, Response $response, $args) 
     {
-        $docId = $args['id'];
+        $docNum = $args['id'];
         $isShort = $args['is_short'] ?? false;
         $data = $request->getParsedBody();
 
-        $check = DB::table('documents')->where('id', $docId)->first();
+        if(!$isShort){
+            $group = DB::table('groups')->where('slug', $args['group_slug'])->first();
+        }else{
+            $group = DB::table('groups')->where('is_default', 1)->first();
+        }
+
+        $menu = DB::table('menus')->where('group_id', $group->id)->where('slug', $args['menu_slug'])->first();
+        $board = DB::table('boards')->find($menu->target_id);
+
+        $check = DB::table('documents')->where('board_id', $board->id)->where('doc_num', $docNum)->first();
         if (!$check) return $response; // 에러처리 생략
         
         if($check->user_id !== ($_SESSION['user_idx'] ?? 0) && ($_SESSION['level'] ?? 0) != 10) {
@@ -904,43 +1171,78 @@ class BoardController
             $_SESSION['flash_type'] = 'error';
             return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
         }
-
-        $group = DB::table('groups')->where('slug', $args['group_slug'])->first();
-        $menu = DB::table('menus')->where('group_id', $group->id)->where('slug', $args['menu_slug'])->first();
-        $board = DB::table('boards')->find($menu->target_id);
-
-        $customData = [];
-        $rawCustom = $data['custom'] ?? [];
-        $definedFields = json_decode($board->custom_fields, true) ?? [];
-        foreach ($definedFields as $field) {
-            $fieldName = $field['name'];
-            $val = $rawCustom[$fieldName] ?? null;
-            if (is_array($val)) $val = implode(',', $val);
-            $customData[$fieldName] = $val;
-        }
-        $jsonCustomData = !empty($customData) ? json_encode($customData, JSON_UNESCAPED_UNICODE) : null;
-
-        $content = trim($data['content']);
-        if ($board->use_editor) {
-            $content = cleanHtml($content);
+        if(($_SESSION['level'] ?? 0) < $board->edit_level) {
+            $_SESSION['flash_message'] = '수정 권한이 없습니다.';
+            $_SESSION['flash_type'] = 'error';
+            return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
         }
 
         if($isShort){
-            $this->returnUrl = $this->basePath . '/' . $args['menu_slug'] . '/' . $docId;
+            $this->returnUrl = $this->basePath . '/' . $args['menu_slug'] . '/' . $docNum;
         }else{
-            $this->returnUrl = $this->basePath . '/au/' . $args['group_slug'] . '/' . $args['menu_slug'] . '/' . $docId;
+            $this->returnUrl = $this->basePath . '/au/' . $args['group_slug'] . '/' . $args['menu_slug'] . '/' . $docNum;
         }
 
-        DB::table('documents')->where('id', $docId)->update([
-            'title' => trim($data['subject']),
-            'content' => $content,
-            'custom_data' => $jsonCustomData,
-            'is_notice' => isset($data['is_notice']) ? 1 : 0,
-            'is_secret' => isset($data['is_secret']) ? 1 : 0,
-            'updated_at' => date('Y-m-d H:i:s')
-        ]);
+        switch($board->type){
+            case 'document': {
+                        
+                $customData = [];
+                $rawCustom = $data['custom'] ?? [];
+                $definedFields = $board->custom_fields ? json_decode($board->custom_fields, true) : [];
+                foreach ($definedFields as $field) {
+                    $fieldName = $field['name'];
+                    $val = $rawCustom[$fieldName] ?? null;
+                    if (is_array($val)) $val = implode(',', $val);
+                    $customData[$fieldName] = $val;
+                }
+                $jsonCustomData = !empty($customData) ? json_encode($customData, JSON_UNESCAPED_UNICODE) : null;
+
+                $content = trim($data['content']);
+                $content = cleanHtml($content);
+
+                DB::table('documents')
+                    ->where('doc_num', $docNum)
+                    ->where('board_id', $board->id)
+                    ->update([
+                        'title' => trim($data['subject']),
+                        'content' => $content,
+                        'custom_data' => $jsonCustomData,
+                        'is_notice' => isset($data['is_notice']) ? 1 : 0,
+                        'is_secret' => isset($data['is_secret']) ? 1 : 0,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                break;
+            }
+            case 'load': {
+                $uploadedFiles = $request->getUploadedFiles();
+                $fileInputName = 'content';
+        
+                if (isset($uploadedFiles[$fileInputName]) && $uploadedFiles[$fileInputName]->getError() === UPLOAD_ERR_OK) {
+                    $file = $uploadedFiles[$fileInputName];
+                    
+                    $uploadDir = __DIR__ . '/../../public/data/uploads/images';
+                    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, recursive: true);
+                    
+                    $filename = uniqid() . '_' . $file->getClientFilename();
+                    $file->moveTo($uploadDir . '/' . $filename);
+                    
+                    $content = '/public/data/uploads/images/' . $filename; 
+                }
+
+                DB::table('documents')
+                ->where('doc_num', $docNum)
+                ->where('board_id', $board->id)
+                ->update([
+                    'content' => $content,
+                    'is_secret' => isset($data['is_secret']) ? 1 : 0,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            break;
+            }
+        }
 
         return $response->withHeader('Location', $this->returnUrl)->withStatus(302);
+
     }
 
     public function getEdit(Request $request, Response $response, $args)
@@ -954,7 +1256,7 @@ class BoardController
             $mainUrl = $this->basePath . '/au/' . $groupSlug;
         }else{
             $group = DB::table('groups')->where('is_default', 1)->first();
-            $mainUrl = $this->basePath . '/';
+            $mainUrl = $this->basePath;
         }
 
         if (!$group) {
@@ -978,7 +1280,9 @@ class BoardController
 
         if ($menu->type === 'board') {
             $board = DB::table('boards')->find($menu->target_id);
-            $document = DB::table('documents')->find($id);
+            $document = DB::table('documents')
+            ->where('board_id', $board->id)
+            ->where('doc_num', $id) ->first();
 
             $myId = $_SESSION['user_idx'] ?? null;
             $myLevel = $_SESSION['level'] ?? 0;
@@ -987,6 +1291,16 @@ class BoardController
                 $_SESSION['flash_message'] = '수정 권한이 없습니다.';
                 $_SESSION['flash_type'] = 'error';
                 return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
+            }
+            if(($myLevel ?? 0) < $board->edit_level) {
+                $_SESSION['flash_message'] = '수정 권한이 없습니다.';
+                $_SESSION['flash_type'] = 'error';
+                return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
+            }
+
+            //만약 접속한 사람이 회원이 아니거나 0레벨인 경우 비밀글 사용 불가
+            if(!isset($_SESSION['user_idx']) || $_SESSION['user_idx'] < 1){
+                $board->use_secret = 0;
             }
 
             $themeLayout = ($group->theme ?? 'basic') . ".layout";
@@ -1001,6 +1315,7 @@ class BoardController
                 'skinUrl' => $skinUrl,
                 'group' => $group,
                 'board' => $board,
+                'mainUrl' => $mainUrl,
                 'document' => $document,
                 'currentUrl' => $this->basePath . '/au/' . $groupSlug . '/' . $menuSlug . '/' . $id
             ]);
@@ -1019,8 +1334,14 @@ class BoardController
             };
 
             $myLevel = $_SESSION['level'] ?? 0;
-            if ($myLevel < $board->write_level) {
+            if ($myLevel < $board->write_level && $myLevel < $board->edit_level) {
                 $_SESSION['flash_message'] = "쓰기 권한이 없습니다.";
+                $_SESSION['flash_type'] = 'error';
+                return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
+            }
+
+            if(!empty($char) && $char->user_id != $_SESSION['user_idx'] && $myLevel < 10){
+                $_SESSION['flash_message'] = "수정 권한이 없습니다.";
                 $_SESSION['flash_type'] = 'error';
                 return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/')->withStatus(302);
             }
@@ -1029,10 +1350,11 @@ class BoardController
             $skinViewPath = 'character.' . $skinName;
 
             $themeLayout = ($group->theme ?? 'basic') . ".layout";
-            $currentUrl = $this->basePath . "/au/$groupSlug/$menuSlug";
+            $currentUrl = $mainUrl . "/$menuSlug";
             $skinUrl = (object) array(
                 'documents' => $this->basePath . '/public/skins/board/' . $board->board_skin
             );
+
 
             $content = $this->blade->render( $skinViewPath . '.write', [
                 'themeLayout' => $themeLayout,
@@ -1042,7 +1364,7 @@ class BoardController
                 'group' => $group,
                 'mode' => 'edit',
                 'character' => $char,
-                'profile' => json_decode($char->profile_data, true) ?? [],
+                'profile' => $char->profile_data ? json_decode($char->profile_data, true) : [],
                 'actionUrl' => $currentUrl . '/' . $id . '/update',
                 'currentUrl' => $currentUrl
             ]);
@@ -1056,4 +1378,266 @@ class BoardController
             return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
         };
     }
+
+    private function savePost($request, $board, $menu) 
+    {
+        $data = $request->getParsedBody();
+                
+        $myLevel = $_SESSION['level'] ?? 0;
+        if ($myLevel < $board->write_level) {
+            return ['success' => false, 'message' => '글 쓰기 권한이 없습니다.'];
+        }
+        $result = DB::connection()->transaction(function () use ($data, $board, $menu) {
+            $title = isset($data['subject']) ? trim($data['subject']) : "";
+            $content = $data['content'];
+            $isNotice = isset($data['is_notice']) ? 1 : 0;
+            $isSecret = isset($data['is_secret']) ? 1 : 0;
+        
+            $customData = [];
+            $rawCustom = $data['custom'] ?? [];
+
+            if($board->use_secret < 1){
+                $isSecret = 0;
+            }
+        
+            $content = cleanHtml($content);
+            
+            $definedFields = $board->custom_fields ? json_decode($board->custom_fields, true) : [];
+        
+            foreach ($definedFields as $field) {
+                $fieldName = $field['name'];
+                $val = $rawCustom[$fieldName] ?? null;
+        
+                if (is_array($val)) {
+                    $val = implode(',', $val);
+                }
+                
+                if (!empty($field['required']) && empty($val)) {
+                     return ['success' => false, 'message' => $fieldName . ' 필드는 필수입니다.'];
+                }
+        
+                $customData[$fieldName] = $val;
+            }
+        
+            $jsonCustomData = !empty($customData) ? json_encode($customData, JSON_UNESCAPED_UNICODE) : null;
+        
+            $userId = $_SESSION['user_idx'] ?? 0;
+            $nickname = $_SESSION['nickname'] ?? '손님';
+            $ip = $_SERVER['REMOTE_ADDR'];
+        
+            $seq = DB::table('board_sequences')
+                     ->where('board_id', $board->id)
+                     ->lockForUpdate()
+                     ->first();
+        
+            if (!$seq) {
+                DB::table('board_sequences')->insert(['board_id' => $board->id, 'last_num' => 0]);
+                $nextNum = 1;
+            } else {
+                $nextNum = $seq->last_num + 1;
+            }
+
+            $doc = \App\Support\Hook::filter('before_document_save', $data);
+        
+            $docId = DB::table('documents')->insertGetId([
+                'group_id' => $menu->group_id,
+                'board_id' => $board->id,
+                'doc_num' => $nextNum,
+                'user_id' => $userId,
+                'nickname' => $nickname,
+                'title' => $title,
+                'content' => $content,
+                'custom_data' => $jsonCustomData,
+                'is_notice' => $isNotice,
+                'is_secret' => $isSecret,
+                'hit' => 0,
+                'comment_count' => 0,
+                'ip_address' => $ip,
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+        
+            DB::table('board_sequences')
+              ->where('board_id', $board->id)
+              ->update(['last_num' => $nextNum]);
+
+            return [
+                'docId' => $docId
+            ];
+        });
+
+        if ($result['docId']) {
+            \App\Support\Hook::Trigger('after_document_save', $result['docId']);
+        }
+    
+    
+        return ['success' => true];
+    }
+
+    private function saveLoadPost($request, $board, $menu)  
+    {
+        $data = $request->getParsedBody();
+
+        $myLevel = $_SESSION['level'] ?? 0;
+        if ($myLevel < $board->write_level) {
+            return ['success' => false, 'message' => '글 쓰기 권한이 없습니다.'];
+        }
+    
+        $result = DB::connection()->transaction(function () use ($request, $data, $board, $menu) {
+    
+            $title = "로드 게시물";
+            $content = "";
+            $isSecret = isset($data['is_secret']) ? 1 : 0;
+            
+            $reply = isset($data['reply']) ? $data['reply'] : "";
+            $cmtId = null;
+    
+            $uploadedFiles = $request->getUploadedFiles();
+            $fileInputName = 'content';
+    
+            if (isset($uploadedFiles[$fileInputName]) && $uploadedFiles[$fileInputName]->getError() === UPLOAD_ERR_OK) {
+                $file = $uploadedFiles[$fileInputName];
+                
+                $uploadDir = __DIR__ . '/../../public/data/uploads/images';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, recursive: true);
+                
+                $filename = uniqid() . '_' . $file->getClientFilename();
+                $file->moveTo($uploadDir . '/' . $filename);
+                
+                $content = '/public/data/uploads/images/' . $filename; 
+            }
+    
+            $userId = $_SESSION['user_idx'] ?? 0;
+            $nickname = $_SESSION['nickname'] ?? '손님';
+            $ip = $_SERVER['REMOTE_ADDR'];
+    
+            $replyCnt = ($reply != "" ? 1 : 0);
+    
+            $seq = DB::table('board_sequences')
+                     ->where('board_id', $board->id)
+                     ->lockForUpdate()
+                     ->first();
+        
+            if (!$seq) {
+                DB::table('board_sequences')->insert(['board_id' => $board->id, 'last_num' => 0]);
+                $nextNum = 1;
+            } else {
+                $nextNum = $seq->last_num + 1;
+            }
+        
+            $docId = DB::table('documents')->insertGetId([
+                'group_id' => $menu->group_id,
+                'board_id' => $board->id,
+                'user_id' => $userId,
+                'doc_num' => $nextNum,
+                'nickname' => $nickname,
+                'title' => $title,
+                'content' => $content,
+                'custom_data' => null,
+                'is_notice' => 0,
+                'is_secret' => $isSecret,
+                'hit' => 0,
+                'comment_count' => $replyCnt,
+                'ip_address' => $ip,
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+
+            
+    
+            if ($reply != "") {
+                $replyArr = $data;
+                $replyArr['content'] = $reply;
+                $reply2 = \App\Support\Hook::filter('before_comment_save', $replyArr);
+                $reply = trim(cleanHtml($reply2['content']));
+
+                $summonArr = [];
+
+                if (preg_match_all('/\[\[(.*?)\]\]/', $reply, $matches)) {
+                    foreach ($matches[1] as $value) {
+                        if(!in_array($value, $summonArr)) $summonArr[] = $value;
+                    }
+                }
+
+                $cmtId = DB::table('comments')->insertGetId([
+                    'board_id' => $board->id,
+                    'doc_id' => $docId,
+                    'user_id' => $userId,
+                    'nickname' => $nickname,
+                    'content' => $reply,
+                    'ip_address' => $ip,
+                    'created_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+        
+            DB::table('board_sequences')
+              ->where('board_id', $board->id)
+              ->update(['last_num' => $nextNum]);
+
+            return [
+                'docId' => $docId,
+                'cmtId' => $cmtId,
+                'replyContent' => $reply,
+                'summonTargets' => $summonArr
+            ];
+        });
+
+        if ($result['docId']) {
+            \App\Support\Hook::Trigger('after_document_save', $result['docId']);
+        }
+
+        if ($result['cmtId']) {
+            
+            \App\Support\Hook::Trigger('after_comment_save', $result['cmtId']);
+
+            foreach ($result['summonTargets'] as $value) {
+                $summon = DB::table('users')->where('nickname', trim($value))->where('is_deleted', 0)->first();
+                if($summon){
+                    $summmonMsg = $result['replyContent'];
+                    $summonUrl = $this->returnUrl;
+    
+                    $this->setNotification($menu->group_id, $summon->id, $_SESSION['user_idx'], $summmonMsg, $summonUrl);
+                }
+            }
+        }
+        
+    
+        return ['success' => true];
+    
+    }
+
+    private function setNotification($groupId, $receiverId, $senderId, $message, $url) {
+        $message = preg_replace('/\r\n|\r|\n/', '', $message);
+        if( mb_strlen($message) > 255 ){
+            $message = mb_substr($message, 0, 252) . '...';
+        }
+        DB::table('notifications')->insert([
+            'group_id' => $groupId,
+            'user_id' => $receiverId,
+            'sender_id' => $senderId,
+            'type' => 'document',
+            'message' => $message,
+            'url' => $url,
+            'is_viewed' => 0,
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+
+    private function getPluginId($target, $id){
+        $plugins = DB::table('plugin_meta')
+        ->join('plugins', 'plugin_meta.plugin_name', '=', 'plugins.name')
+        ->where('plugin_meta.target_type', $target)
+        ->where('plugin_meta.target_id', $id)
+        ->where('plugin_meta.key_name', 'result')
+        ->where('plugins.is_active', 1) 
+        ->select('plugin_meta.*')
+        ->get();
+
+        $values = "";
+        foreach($plugins as $value){
+            $values .= $value->value;
+        }
+
+        return $values ?? '';
+    }
+    
+
 }

@@ -1,13 +1,29 @@
 <?php
+ini_set('display_errors', 0); 
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+
 use DI\Container;
+use Slim\Exception\HttpException;
 use Slim\Factory\AppFactory;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Pagination\Paginator;
 use Jenssegers\Blade\Blade;
+use Psr\Http\Message\ServerRequestInterface;
+
+$sessionLifeTime = 86400; 
+ini_set('session.gc_maxlifetime', $sessionLifeTime); 
+ini_set('session.cookie_lifetime', $sessionLifeTime); 
+$sessionPath = __DIR__ . '/../cache/sessions';
+if (!file_exists($sessionPath)) {
+    mkdir($sessionPath, 0777, true);
+}
+ini_set('session.save_path', $sessionPath);
 
 session_start();
 
 require __DIR__ . '/../vendor/autoload.php';
+
+date_default_timezone_set('Asia/Seoul');
 
 if (!file_exists(__DIR__ . '/../.env')) {
     require __DIR__ . '/../lib/Installer/installer_routes.php';
@@ -26,13 +42,14 @@ $dotenv->load();
 $capsule = new Capsule;
 $capsule->addConnection([
     'driver'    => 'mysql',
-    'host'      => env('DB_HOST', '127.0.0.1') . ':'. env('DB_PORT', '3306'),
+    'host'      => env('DB_HOST', 'localhost'), 
+    'port'      => env('DB_PORT', '3306'),      
     'database'  => env('DB_DATABASE', ''),
     'username'  => env('DB_USERNAME', 'root'),
     'password'  => env('DB_PASSWORD', ''),
     'charset'   => 'utf8mb4',
     'collation' => 'utf8mb4_unicode_ci',
-    'prefix'    => env('TABLE_PREFIX', 'hc_'),
+    'prefix'    => env('TABLE_PREFIX', 'cu_'),
 ]);
 $capsule->setAsGlobal();
 $capsule->bootEloquent();
@@ -73,44 +90,76 @@ require __DIR__ . '/../lib/VersionService.php';
 $pluginLoader = new \App\Services\PluginLoader($app);
 $pluginLoader->boot();
 
+$app->add(new \App\Middleware\AutoLoginMiddleware());
+
 require __DIR__ . '/../routes/auth.php';
 require __DIR__ . '/../routes/admin.php';
 require __DIR__ . '/../routes/web.php';
 require __DIR__ . '/../routes/api.php';
 
-$app->add(function ($request, $handler) use ($blade, $app) {
-    $blade->share('base_path', $app->getBasePath());
+$app->add(function ($request, $handler) use ($blade, $basePath) {
+    $blade->share('base_path', $basePath);
     return $handler->handle($request);
 });
 
+\App\Support\PluginHelper::setBasePath($basePath);
 
-$blade->compiler()->directive('hc_menu', function ($expression) {
+$blade->compiler()->directive('custard_menu', function ($expression) {
     return "<?php echo Widget::menu(\$base_path, $expression); ?>";
 });
 
-$blade->compiler()->directive('hc_login', function ($expression) {
+$blade->compiler()->directive('custard_login', function ($expression) {
     return "<?php echo Widget::login(\$base_path, $expression ?? null) ?>";
 });
 
-$blade->compiler()->directive('hc_latestPost', function ($page=10, $subLimit=20, $gSlug = null) {
+$blade->compiler()->directive('custard_latestPost', function ($page=10, $subLimit=20, $gSlug = null) {
     return "<?php echo Widget::latestPosts(\$base_path, $page, $subLimit, $gSlug) ?>";
 });
 
-$blade->compiler()->directive('hook', function ($expression) {
-    return "<?php \App\Support\Hook::trigger($expression); ?>";
+$blade->compiler()->directive('hook', function ($expression, $handler = null) {
+    return "<?php \App\Support\Hook::trigger($expression, $handler); ?>";
 });
 
-$errorMiddleware = $app->addErrorMiddleware(true, true, true);
-$errorMiddleware->setErrorHandler(
-    \Slim\Exception\HttpNotFoundException::class,
-    function () use ($app, $blade) {
+$errorMiddleware = $app->addErrorMiddleware(false, true, true);
+
+$errorMiddleware->setDefaultErrorHandler(
+    function (
+        ServerRequestInterface $request, 
+        \Throwable $exception, 
+        bool $displayErrorDetails, 
+        bool $logErrors, 
+        bool $logErrorDetails
+    ) use ($app, $blade) {
         $response = $app->getResponseFactory()->createResponse();
-        $content = $blade->render('errors.404', [
-            'title' => '페이지를 찾을 수 없습니다',
-            'errorMessage' => '요청하신 페이지가 존재하지 않습니다.'
-        ]);
-        $response->getBody()->write($content);
-        return $response->withStatus(404);
+        
+        $code = $exception->getCode();
+        
+        if (!is_numeric($code) || $code < 100 || $code > 599) {
+            $code = 500;
+        }
+
+        $message = $displayErrorDetails ? $exception->getMessage() : '서버에 문제가 발생했습니다.';
+
+        $titles = [
+            401 => '로그인이 필요합니다',
+            403 => '접근 권한이 없습니다',
+            404 => '페이지를 찾을 수 없습니다',
+            500 => '서버 내부 오류',
+        ];
+        $title = $titles[$code] ?? '오류가 발생했습니다';
+
+        try {
+            $content = $blade->render('errors.errors', [
+                'title' => $title,
+                'errorMessage' => $message,
+                'code' => $code
+            ]);
+            $response->getBody()->write($content);
+        } catch (\Throwable $renderError) {
+            $response->getBody()->write("<div style='padding:2rem; font-family:sans-serif;'><h1>{$title}</h1><p>{$message}</p></div>");
+        }
+        
+        return $response->withStatus((int)$code);
     }
 );
 
