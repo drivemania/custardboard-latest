@@ -1,0 +1,7 @@
+{
+    "id": "custardRandom",
+    "name": "랜덤 메세지 출력 플러그인",
+    "version": "1.0.0",
+    "author": "LH커뮤공사",
+    "description": "관리자가 설정한 랜덤 메세지를 출력합니다."
+}

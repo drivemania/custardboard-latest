@@ -2,9 +2,11 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>쪽지 쓰기</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
     <style>body { font-family: 'Pretendard', sans-serif; }</style>
 </head>
 <body class="bg-gray-50 p-4 h-screen flex flex-col">
@@ -24,7 +26,7 @@
     @endif
 
     <div class="flex justify-between items-center mb-4">
-        <h2 class="font-bold text-lg text-gray-800">✉️ 쪽지 보내기</h2>
+        <h2 class="font-bold text-lg text-gray-800">쪽지 보내기</h2>
         <a href="{{ $base_path }}/memo" class="text-gray-500 text-sm hover:underline">취소</a>
     </div>
 
@@ -41,7 +43,7 @@
                        placeholder="상대방 아이디 입력" required readonly>
                     <p class="text-xs text-blue-600 mt-1">To. {{ $toUser->nickname }}님에게 답장</p>
                 @else
-                <select id="receiver_id" name="receiver_id" class="w-full text-sm border-gray-300 rounded focus:ring-indigo-500" required>
+                <select id="receiver_id" name="receiver_id" class="w-full text-sm border-gray-300 rounded focus:ring-amber-500" required>
                     @foreach($receiverId as $rec)
                         <option value="{{ $rec->user_id }}">{{ $rec->user_id }}({{ $rec->nickname }})</option>
                     @endforeach
@@ -56,14 +58,14 @@
 
             <div>
                 <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 shadow-md transition">
-                    전송하기 🚀
+                    전송하기
                 </button>
             </div>
         </div>
     </form>
 
 </body>
-@if($toUser)
+@if(!$toUser)
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -74,7 +76,6 @@
                 direction: "asc"
             },
             placeholder: "캐릭터 이름을 입력하세요...",
-            plugins: ['clear_button'],
         });
     });
 </script>

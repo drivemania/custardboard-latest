@@ -2,9 +2,10 @@
 namespace App\Services;
 
 class VersionService {
-    const CURRENT_VERSION = '0.0.2';
+    const CURRENT_VERSION = '0.3.0';
+    const CURRENT_CODENAME = 'Cinnamon';
     
-    const UPDATE_URL = 'https://drivemania.github.io/hochoboard-doc/version.json';
+    const UPDATE_URL = 'https://drivemania.github.io/custardboard-doc/version.json';
     
     private $cacheFile;
 
@@ -66,7 +67,9 @@ class VersionService {
         return [
             'has_update'     => $hasUpdate,
             'current_version'=> self::CURRENT_VERSION,
+            'current_codename'=> self::CURRENT_CODENAME,
             'latest_version' => $remoteData['latest_version'],
+            'latest_codename'=> $remoteData['latest_codename'],
             'message'        => $remoteData['message'] ?? '',
             'link'           => $remoteData['download_url'] ?? '#',
             'importance'     => $remoteData['importance'] ?? 'normal'

@@ -11,8 +11,10 @@ class ContentParser
 
     public function parse($content)
     {
+        $content = $content ?? '';
+
         $content = preg_replace_callback(
-            '/@hc_menu\((.*?)\)/',
+            '/@custard_menu\((.*?)\)/',
             function ($matches) {
                 $arg = strip_tags($matches[1]);
                 $arg = html_entity_decode($arg, ENT_QUOTES | ENT_HTML5);
@@ -23,7 +25,7 @@ class ContentParser
         );
 
         $content = preg_replace_callback(
-            '/@hc_login\((.*?)\)/',
+            '/@custard_login\((.*?)\)/',
             function ($matches) {
                 $arg = strip_tags($matches[1]);
                 $arg = html_entity_decode($arg, ENT_QUOTES | ENT_HTML5);
@@ -34,7 +36,7 @@ class ContentParser
         );
 
         $content = preg_replace_callback(
-            '/@hc_latestPost\((.*?)\)/',
+            '/@custard_latestPost\((.*?)\)/',
             function ($matches) {
                 $cleanString = strip_tags($matches[1]);
                 $cleanString = html_entity_decode($cleanString, ENT_QUOTES | ENT_HTML5);

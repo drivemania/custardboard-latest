@@ -1,0 +1,7 @@
+{
+    "id": "custardMannerChk",
+    "name": "댓글 매너 체크 플러그인",
+    "version": "1.0.0",
+    "author": "LH커뮤공사",
+    "description": "회원별로 자신의 로그 바로 아래 3개 댓글을 달았는지 체크합니다."
+}
