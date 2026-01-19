@@ -9,9 +9,11 @@
 <div class="max-w-6xl mx-auto p-4">
     <div class="flex justify-between items-center mb-6 border-b pb-4">
         <h2 class="text-2xl font-bold text-gray-800">캐릭터 명단</h2>
+        @if(1==1)
         <a href="{{ $currentUrl }}/write" class="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">
             + 새 캐릭터 생성
         </a>
+        @endif
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

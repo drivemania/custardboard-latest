@@ -7,6 +7,8 @@ $basePath = $app->getBasePath();
 
 $boardController = new \App\Controller\BoardController($blade, $basePath);
 $characterController = new \App\Controller\CharacterController($blade, $basePath);
+$shopController = new \App\Controller\ShopController($blade, $basePath);
+$pluginDispatcherController = new \App\Controller\PluginDispatcherController();
 
 $secretCheckMiddleware = new \App\Middleware\SecretCheckMiddleware($basePath);
 
@@ -66,6 +68,34 @@ $app->get('/', function (Request $request, Response $response) use ($blade, $bas
     $response->getBody()->write($content);
     return $response;
 })->add($secretCheckMiddleware);
+
+$app->post('/image/upload', function (Request $request, Response $response) use ($basePath) {
+    $files = $request->getUploadedFiles();
+    
+    if (empty($files['upload']) || $files['upload']->getError() !== UPLOAD_ERR_OK) {
+        $data = ['error' => ['message' => '파일 업로드 실패']];
+        $response->getBody()->write(json_encode($data));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+    }
+
+    $uploadFile = $files['upload'];
+    $extension = pathinfo($uploadFile->getClientFilename(), PATHINFO_EXTENSION);
+    
+    $directory = __DIR__ . '/../public/data/uploads/editor';
+    if (!is_dir($directory)) {
+        mkdir($directory, 0777, true);
+    }
+
+    $filename = uniqid() . '_' . time() . '.' . $extension;
+    $uploadFile->moveTo($directory . DIRECTORY_SEPARATOR . $filename);
+
+    $data = [
+        'url' => $basePath . '/public/data/uploads/editor/' . $filename
+    ];
+
+    $response->getBody()->write(json_encode($data));
+    return $response->withHeader('Content-Type', 'application/json');
+});
 
 //메모 처리부
 $app->group('/memo', function ($group) use ($blade, $basePath) {
@@ -315,12 +345,16 @@ $app->post('/character/set-main', function (Request $request, Response $response
     return $response->withHeader('Location', $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/');
 });
 
-$app->any('/plugin/{plugin_name}/{action}', \App\Controller\PluginDispatcherController::class . ':dispatch');
+$app->any('/plugin/{plugin_name}/{action}', [$pluginDispatcherController, 'dispatch']);
 
 //긴주소
 $app->get('/au/{group_slug}/{menu_slug}/{id:[0-9]+}/edit', [$boardController, 'getEdit'])->add($secretCheckMiddleware);
 
 $app->post('/au/{group_slug}/{menu_slug}/store', [$characterController, 'store'])->add($secretCheckMiddleware);
+
+$app->post('/au/{group_slug}/{menu_slug}/item/{inv_id:[0-9]+}/use', [$shopController, 'itemUse']);
+
+$app->post('/au/{group_slug}/{menu_slug}/item/{inv_id:[0-9]+}/sell', [$shopController, 'itemSell']);
 
 $app->post('/au/{group_slug}/{menu_slug}/{id:[0-9]+}/update', [$characterController, 'update']);
 
@@ -332,11 +366,11 @@ $app->post('/au/{group_slug}/{menu_slug}/{id:[0-9]+}/relation/delete', [$charact
 
 $app->post('/au/{group_slug}/{menu_slug}/{id:[0-9]+}/relation/reorder', [$characterController, 'reorderRelation']);
 
-$app->post('/au/{group_slug}/{menu_slug}/{doc_id:[0-9]+}/edit', [$boardController, 'edit'])->setArgument('is_short', false)->add($secretCheckMiddleware);
+$app->post('/au/{group_slug}/{menu_slug}/{id:[0-9]+}/edit', [$boardController, 'edit'])->setArgument('is_short', false)->add($secretCheckMiddleware);
 
-$app->post('/au/{group_slug}/{menu_slug}/{doc_id:[0-9]+}/delete', [$boardController, 'bdelete'])->setArgument('is_short', false);
+$app->post('/au/{group_slug}/{menu_slug}/{id:[0-9]+}/delete', [$boardController, 'bdelete'])->setArgument('is_short', false);
 
-$app->post('/au/{group_slug}/{menu_slug}/{doc_id:[0-9]+}/comment', [$boardController, 'comment'])->setArgument('is_short', false)->add($secretCheckMiddleware);
+$app->post('/au/{group_slug}/{menu_slug}/{id:[0-9]+}/comment', [$boardController, 'comment'])->setArgument('is_short', false)->add($secretCheckMiddleware);
 
 $app->post('/au/{group_slug}/{menu_slug}/write', [$boardController, 'write']);
 
@@ -350,6 +384,10 @@ $app->get('/au/{group_slug}/{menu_slug}/{action}[/]', [$boardController, 'index'
 $app->post('/{menu_slug}/write', [$boardController, 'write']);
 
 $app->post('/{menu_slug}/store', [$characterController, 'store'])->add($secretCheckMiddleware);
+
+$app->post('/{menu_slug}/item/{inv_id:[0-9]+}/use', [$shopController, 'itemUse']);
+
+$app->post('/{menu_slug}/item/{inv_id:[0-9]+}/sell', [$shopController, 'itemSell']);
 
 $app->get('/{menu_slug}/{id:[0-9]+}/edit', [$boardController, 'getEdit'])->add($secretCheckMiddleware);
 

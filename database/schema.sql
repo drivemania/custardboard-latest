@@ -79,7 +79,7 @@ CREATE TABLE `__PREFIX__documents` (
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `__PREFIX__groups` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `slug` varchar(50) NOT NULL,
   `is_default` tinyint(1) DEFAULT 0,
   `name` varchar(100) NOT NULL,
@@ -91,6 +91,7 @@ CREATE TABLE `__PREFIX__groups` (
   `custom_main_id` int(11) DEFAULT 0,
   `favicon` varchar(255) DEFAULT NULL,
   `og_image` varchar(255) DEFAULT NULL,
+  `point_name` varchar(10) DEFAULT '포인트' NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `is_deleted` tinyint(1) DEFAULT 0,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -104,8 +105,9 @@ CREATE TABLE `__PREFIX__menus` (
   `group_id` int(11) NOT NULL,
   `type` varchar(20) DEFAULT 'board',
   `target_id` int(11) NOT NULL,
+  `target_url` varchar(2048) NULL DEFAULT NULL,
   `title` varchar(255) NOT NULL,
-  `slug` varchar(255) NOT NULL,
+  `slug` varchar(255) DEFAULT NULL,
   `order_num` int(11) DEFAULT 0,
   `is_show` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -131,7 +133,7 @@ CREATE TABLE `__PREFIX__messages` (
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `__PREFIX__notifications` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `group_id` int(11) NOT NULL DEFAULT 0,
   `user_id` int(11) NOT NULL,
   `sender_id` int(11) NOT NULL DEFAULT 0,
@@ -139,22 +141,24 @@ CREATE TABLE `__PREFIX__notifications` (
   `message` varchar(255) NOT NULL,
   `url` varchar(255) DEFAULT NULL,
   `is_viewed` tinyint(1) DEFAULT 0,
-  `created_at` datetime DEFAULT NULL,
+  `created_at` timestamp DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_user_viewed` (`user_id`,`is_viewed`)
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `__PREFIX__users` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `user_id` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
   `nickname` varchar(50) NOT NULL,
   `email` varchar(100) DEFAULT NULL,
   `birthdate` date DEFAULT NULL,
   `level` tinyint(3) unsigned DEFAULT 1,
+  `user_point` int(11) DEFAULT 0,
   `is_deleted` tinyint(1) DEFAULT 0,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_login_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_id` (`user_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -164,7 +168,7 @@ CREATE TABLE `__PREFIX__plugins` (
   `name` varchar(100) NOT NULL,
   `directory` varchar(100) NOT NULL DEFAULT '',
   `is_active` tinyint(1) NOT NULL DEFAULT 0,
-  `created_at` datetime NOT NULL,
+  `created_at` timestamp NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_directory` (`directory`)
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -173,7 +177,7 @@ CREATE TABLE `__PREFIX__emoticons` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `code` varchar(50) NOT NULL,
   `image_path` varchar(255) NOT NULL,
-  `created_at` datetime DEFAULT NULL,
+  `created_at` timestamp DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_code` (`code`)
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -189,20 +193,60 @@ CREATE TABLE `__PREFIX__user_autologin` (
   `user_id` int(11) NOT NULL,
   `token` varchar(255) NOT NULL,
   `last_ip` varchar(100) DEFAULT NULL,
-  `created_at` datetime DEFAULT current_timestamp(),
-  `expires_at` datetime NOT NULL,
+  `created_at` timestamp DEFAULT current_timestamp(),
+  `expires_at` timestamp NOT NULL,
   PRIMARY KEY (`key_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `__PREFIX__plugin_meta` (
-  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `id` int(11) unsigned AUTO_INCREMENT PRIMARY KEY,
   `target_type` VARCHAR(50) NOT NULL,
   `target_id` BIGINT UNSIGNED NOT NULL,
   `plugin_name` VARCHAR(50) NOT NULL,
   `key_name` VARCHAR(50) NOT NULL,
   `value` LONGTEXT,
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_target` (`target_type`, `target_id`),
   INDEX `idx_plugin` (`plugin_name`, `key_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `__PREFIX__items` (
+    `id` int(11) unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(255) NOT NULL,
+    `description` TEXT NULL,
+    `icon_path` VARCHAR(2048) NULL,
+    `effect_type` ENUM('none', 'lottery', 'create_item', 'random_box') NOT NULL DEFAULT 'none',
+    `effect_data` longtext NULL,
+    `is_sellable` TINYINT(1) NOT NULL DEFAULT 0,
+    `sell_price` INT NOT NULL DEFAULT 0,
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `is_deleted` TINYINT(1) NOT NULL DEFAULT 0,
+    `deleted_at` timestamp NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `__PREFIX__character_items` (
+    `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `character_id` int(11) UNSIGNED NOT NULL,
+    `item_id` int(11) UNSIGNED NOT NULL,
+    `quantity` INT UNSIGNED NOT NULL DEFAULT 1,
+    `options` longtext NULL, 
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `is_deleted` TINYINT(1) NOT NULL DEFAULT 0,
+    `deleted_at` timestamp NULL,
+    INDEX `idx_char_item` (`character_id`, `item_id`),
+    FOREIGN KEY (`item_id`) REFERENCES `__PREFIX__items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `__PREFIX__settlement_logs` (
+    `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `group_id` int(11) UNSIGNED NOT NULL,
+    `admin_id` int(11) UNSIGNED NOT NULL,
+    `target_count` INT UNSIGNED NOT NULL DEFAULT 0,
+    `target_list` longtext NULL,
+    `point_amount` INT NOT NULL DEFAULT 0,
+    `items_json` longtext NULL,
+    `reason` TEXT NOT NULL,
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_group_admin` (`group_id`, `admin_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

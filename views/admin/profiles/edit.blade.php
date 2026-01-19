@@ -64,7 +64,12 @@
 
                             <div class="w-16 text-center pt-5">
                                 <label class="inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" :name="`char_fields[${index}][required]`" x-model="field.required" value="1" class="w-4 h-4 text-blue-600 rounded">
+                                    <input type="checkbox" 
+                                        :name="`char_fields[${index}][required]`" 
+                                        value="1" 
+                                        class="w-4 h-4 text-blue-600 rounded"
+                                        :checked="field.required == 1" 
+                                        @change="field.required = $el.checked ? 1 : 0">
                                     <span class="ml-1 text-xs text-gray-600">필수</span>
                                 </label>
                             </div>

@@ -25,17 +25,23 @@ class Widget {
 
         foreach ($menus as $m) {
             $group = DB::table('groups')->find($m->group_id);
-            
-            $link = "{$basePath}/au/{$group->slug}/{$m->slug}"; 
-            if($group->is_default === 1){
-                $link = "{$basePath}/{$m->slug}"; 
+
+            $a_target = "";
+            if($m->type == 'link'){
+                $link = $m->target_url;
+                $a_target = 'target="_blank"';
+            }else{
+                $link = "{$basePath}/au/{$group->slug}/{$m->slug}"; 
+                if($group->is_default === 1){
+                    $link = "{$basePath}/{$m->slug}"; 
+                }
             }
 
             $currentUri = $_SERVER['REQUEST_URI'] ?? '';
-            $isActive = (strpos($currentUri, $m->slug) !== false) ? ' active' : '';
+            $isActive = (strpos($currentUri, $m->slug) !== false && $m->type != 'link') ? ' active' : '';
 
             $html .= '<li class="hc-menu-item' . $isActive . '">';
-            $html .= '<a href="' . $link . '" class="hc-menu-link">' . htmlspecialchars($m->title) . '</a>';
+            $html .= '<a href="' . $link . '" class="hc-menu-link" '.$a_target.'>' . htmlspecialchars($m->title) . '</a>';
             $html .= '</li>';
         }
 
@@ -51,6 +57,7 @@ class Widget {
      */
     public static function login($basePath, $groupSlug = null) {
         $html = '<div class="hc-login-widget">';
+        $charUrl = "";
 
         if (isset($_SESSION['user_idx'])) {
             $userIdx = $_SESSION['user_idx'] ?? 0;
@@ -65,6 +72,16 @@ class Widget {
                     ->where('characters.is_main', 1)
                     ->select('characters.*') 
                     ->first();
+                if(!empty($mainChar)){
+                    $menus = DB::table('menus')
+                    ->where('target_id', $mainChar->board_id)
+                    ->first();
+                    $charUrl = 'onclick="location.href=\'';
+                    $charUrl .= $basePath."/au/".$groupSlug."/".$menus->slug."/".$mainChar->id;
+                    $charUrl .= '\'"';
+                    $charUrl .= ' style="cursor: pointer;"';
+                }
+                
             }
 
             $html .= '<div x-data="{ count: 0 }" x-init="fetch(\'' . $basePath . '/api/memo/count\').then(r => r.json()).then(d => count = d.count)" class="hc-memo-alert">';
@@ -78,11 +95,11 @@ class Widget {
                 $html .= '<div class="hc-main-char">';
                 
                 $imgSrc = $mainChar->image_path ? $mainChar->image_path : '';
-                $html .= '<div class="hc-main-char-img">';
+                $html .= '<div class="hc-main-char-img" '.$charUrl.'>';
                 $html .= '<img src="' . $imgSrc . '" alt="Main Character">';
                 $html .= '</div>';
                 
-                $html .= '<div class="hc-main-char-text">';
+                $html .= '<div class="hc-main-char-text" '.$charUrl.'>';
                 $html .= '<span class="hc-main-char-name">' . htmlspecialchars($mainChar->name) . '</span>';
                 $html .= '</div>';
                 
@@ -140,6 +157,7 @@ class Widget {
         $docs = DB::table('documents')
             ->join('menus', function($join) {
                 $join->on('documents.board_id', '=', 'menus.target_id')
+                    ->on('documents.group_id', '=', 'menus.group_id')
                     ->whereIn('menus.type', array('board', 'load'));
             })
             ->where('documents.is_deleted', 0)
@@ -154,7 +172,7 @@ class Widget {
                 'menus.type as menu_type',
                 DB::raw("NULL as comment_id"),
                 DB::raw("'doc' as type")
-                    );
+                );  
 
         if (!empty($groupSlug)) {
             $docs->join('groups', 'menus.group_id', '=', 'groups.id')
@@ -165,6 +183,7 @@ class Widget {
             ->join('documents', 'comments.doc_id', '=', 'documents.id')
             ->join('menus', function($join) {
                 $join->on('documents.board_id', '=', 'menus.target_id')
+                    ->on('documents.group_id', '=', 'menus.group_id')
                     ->whereIn('menus.type', array('board', 'load'));
             })
             ->where('comments.is_deleted', 0)
@@ -184,13 +203,19 @@ class Widget {
 
         if (!empty($groupSlug)) {
             $comments->join('groups', 'menus.group_id', '=', 'groups.id')
-                    ->where('groups.slug', $groupSlug);
+                ->where('groups.slug', $groupSlug);
         }
 
         $items = $docs->unionAll($comments)
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();
+
+        $groups = DB::table('groups')
+            ->where('slug', $groupSlug)
+            ->where('is_deleted', 0)
+            ->first();
+
 
         $html = '<div class="hc-latest-widget">';
         $html .= '<h3 class="hc-latest-title">최신 글 & 댓글</h3>';
@@ -209,7 +234,11 @@ class Widget {
                     $subject = '...';
                 }
 
-                $url = $basePath . '/' . $item->menu_slug . '/' . $item->doc_num;
+                $url = "$basePath/au/$groupSlug/$item->menu_slug/$item->doc_num";
+                if($groups->is_default > 0){
+                    $url = $basePath . '/' . $item->menu_slug . '/' . $item->doc_num;
+
+                }
                 if ($item->type === 'cmt') {
                     $url .= '#comment_' . $item->comment_id;
                 }

@@ -167,7 +167,7 @@ class BoardController extends Model
                         return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
                     }
 
-                    if ($document->is_secret > 0 && $document->user_id != $_SESSION['user_idx'] && $_SESSION['user_idx'] < 10) {
+                    if ($document->is_secret > 0 && $document->user_id != $_SESSION['user_idx'] && $_SESSION['level'] < 10) {
                         $_SESSION['flash_message'] = "권한이 없습니다.";
                         $_SESSION['flash_type'] = 'error';
                         return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
@@ -240,9 +240,10 @@ class BoardController extends Model
                             ->where('characters.is_main', '=', 1);
                     })
                     ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
-                    ->leftJoin('menus as char_menu', function($join) {
+                    ->leftJoin('menus as char_menu', function($join) use ($group) {
                         $join->on('characters.board_id', '=', 'char_menu.target_id')
                             ->where('char_menu.type', '=', 'character')
+                            ->where('char_menu.group_id', '=', $group->id)
                             ->where('char_menu.is_deleted', '=', 0);
                     })
                     ->where('documents.board_id', $board->id)
@@ -308,9 +309,10 @@ class BoardController extends Model
                                 ->where('characters.is_main', '=', 1);
                         })
                         ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
-                        ->leftJoin('menus as char_menu', function($join) {
+                        ->leftJoin('menus as char_menu', function($join) use ($group) {
                             $join->on('characters.board_id', '=', 'char_menu.target_id')
                                 ->where('char_menu.type', '=', 'character')
+                                ->where('char_menu.group_id', '=', $group->id)
                                 ->where('char_menu.is_deleted', '=', 0);
                         })
                         ->where('comments.doc_id', $doc->id)
@@ -433,6 +435,25 @@ class BoardController extends Model
 
                     }
 
+                    $inventory = DB::table('character_items')
+                    ->join('items', 'character_items.item_id', '=', 'items.id')
+                    ->where('character_items.character_id', $charId)
+                    ->where('items.is_deleted', 0)
+                    ->where('character_items.quantity', '>', 0)
+                    ->where('character_items.is_deleted', 0)
+                    ->select([
+                        'character_items.id as inventory_id',
+                        'character_items.quantity',
+                        'items.id as item_id',
+                        'items.name',
+                        'items.description',
+                        'items.icon_path',
+                        'items.effect_type',
+                        'items.is_sellable',
+                        'items.sell_price'
+                    ])
+                    ->get();
+
                     $otherCharacters = DB::table('characters')
                         ->where('group_id', $character->group_id)
                         ->where('is_deleted', 0)
@@ -440,7 +461,14 @@ class BoardController extends Model
                         ->orderBy('name', 'asc')
                         ->get();
                     
-                    $owner = DB::table('users')->find($character->user_id);
+                    $owner = DB::table('users')
+                        ->leftJoin('groups', function($join) use ($character) {
+                            $join->where('groups.id', '=', $character->group_id);
+                        })
+                        ->where('users.id', $character->user_id)
+                        ->select('users.*', 'groups.point_name')
+                        ->first();
+                    $point = $owner->user_point ." ". $owner->point_name;
                     
                     $content = $this->blade->render($skinViewPath . '.view', [
                         'themeLayout' => $themeLayout,
@@ -449,7 +477,9 @@ class BoardController extends Model
                         'skinUrl' => $skinUrl,
                         'group' => $group,
                         'character' => $character,
+                        'inventory' => $inventory,
                         'owner' => $owner ? $owner->nickname : '알수없음',
+                        'point' => $point,
                         'profile' => $character->profile_data ? json_decode($character->profile_data, associative: true) : [],
                         'relations' => $finalRelations,
                         'otherCharacters' => $otherCharacters,
@@ -510,9 +540,10 @@ class BoardController extends Model
                              ->where('characters.group_id', '=', $group->id)
                              ->where('characters.is_main', '=', 1);
                     })
-                    ->leftJoin('menus as char_menu', function($join) {
+                    ->leftJoin('menus as char_menu', function($join) use ($group) {
                         $join->on('characters.board_id', '=', 'char_menu.target_id')
                              ->where('char_menu.type', '=', 'character')
+                             ->where('char_menu.group_id', '=', $group->id)
                              ->where('char_menu.is_deleted', '=', 0);
                     })
                     ->orderBy('documents.is_notice', 'desc')
@@ -542,9 +573,10 @@ class BoardController extends Model
                                 ->where('characters.group_id', '=', $group->id)
                                 ->where('characters.is_main', '=', 1);
                         })
-                        ->leftJoin('menus as char_menu', function($join) {
+                        ->leftJoin('menus as char_menu', function($join) use ($group) {
                             $join->on('characters.board_id', '=', 'char_menu.target_id')
                                 ->where('char_menu.type', '=', 'character')
+                                ->where('char_menu.group_id', '=', $group->id)
                                 ->where('char_menu.is_deleted', '=', 0);
                         })
                         ->orderBy('comments.created_at', 'asc')
@@ -611,9 +643,10 @@ class BoardController extends Model
                             ->where('characters.is_main', '=', 1);
                     })
                     ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
-                    ->leftJoin('menus as char_menu', function($join) {
+                    ->leftJoin('menus as char_menu', function($join) use ($group) {
                         $join->on('characters.board_id', '=', 'char_menu.target_id')
                             ->where('char_menu.type', '=', 'character')
+                            ->where('char_menu.group_id', '=', $group->id)
                             ->where('char_menu.is_deleted', '=', 0);
                     })
                     ->where('documents.board_id', $board->id)
@@ -669,9 +702,10 @@ class BoardController extends Model
                                 ->where('characters.is_main', '=', 1);
                         })
                         ->leftJoin('groups as char_group', 'characters.group_id', '=', 'char_group.id')
-                        ->leftJoin('menus as char_menu', function($join) {
+                        ->leftJoin('menus as char_menu', function($join) use ($group) {
                             $join->on('characters.board_id', '=', 'char_menu.target_id')
                                 ->where('char_menu.type', '=', 'character')
+                                ->where('char_menu.group_id', '=', $group->id)
                                 ->where('char_menu.is_deleted', '=', 0);
                         })
                         ->where('comments.doc_id', $doc->id)
@@ -773,7 +807,6 @@ class BoardController extends Model
             $this->returnUrl = "/$menuSlug";
         }
 
-
         if (!$group) {
             $_SESSION['flash_message'] = "페이지를 찾을 수 없습니다. 1";
             $_SESSION['flash_type'] = 'error';
@@ -793,6 +826,8 @@ class BoardController extends Model
                 $_SESSION['flash_type'] = 'error';
                 return $response->withHeader('Location', $this->basePath . '/')->withStatus(302);
             };
+
+        
 
         if( $board->type == "load" ) {
             $result = $this->saveLoadPost($request, $board, $menu);
@@ -922,9 +957,9 @@ class BoardController extends Model
         $after = \App\Support\Hook::filter('after_comment_save', $cmtId);
 
         if($isShort){
-            $this->returnUrl = $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/';
+            $this->returnUrl = $_SERVER['HTTP_REFERER']."#comment_$cmtId" ?? $this->basePath . '/';
         }else{
-            $this->returnUrl = $_SERVER['HTTP_REFERER'] ?? $this->basePath . '/'; //혹시모르니까
+            $this->returnUrl = $_SERVER['HTTP_REFERER']."#comment_$cmtId" ?? $this->basePath . '/'; //혹시모르니까
         }
     
         DB::table('documents')->where('id', $docId)->increment('comment_count');
@@ -1051,6 +1086,7 @@ class BoardController extends Model
                 'skinUrl' => $skinUrl,
                 'group' => $group,
                 'board' => $board,
+                'mainUrl' => $mainUrl,
                 'document' => $document,
                 'currentUrl' => $this->basePath . '/au/' . $groupSlug . '/' . $menuSlug . '/' . $id
             ]);
@@ -1117,6 +1153,11 @@ class BoardController extends Model
     private function savePost($request, $board, $menu) 
     {
         $data = $request->getParsedBody();
+                
+        $myLevel = $_SESSION['level'] ?? 0;
+        if ($myLevel < $board->write_level) {
+            return ['success' => false, 'message' => '글 쓰기 권한이 없습니다.'];
+        }
         DB::connection()->transaction(function () use ($data, $board, $menu) {
             $title = isset($data['subject']) ? trim($data['subject']) : "";
             $content = $data['content'];
@@ -1125,12 +1166,7 @@ class BoardController extends Model
         
             $customData = [];
             $rawCustom = $data['custom'] ?? [];
-        
-            $myLevel = $_SESSION['level'] ?? 0;
-            if ($myLevel < $board->write_level) {
-                return ['success' => false, 'message' => '글 쓰기 권한이 없습니다.'];
-            }
-    
+
             if($board->use_secret < 1){
                 $isSecret = 0;
             }
@@ -1201,6 +1237,11 @@ class BoardController extends Model
     private function saveLoadPost($request, $board, $menu)  
     {
         $data = $request->getParsedBody();
+
+        $myLevel = $_SESSION['level'] ?? 0;
+        if ($myLevel < $board->write_level) {
+            return ['success' => false, 'message' => '글 쓰기 권한이 없습니다.'];
+        }
     
         DB::connection()->transaction(function () use ($request, $data, $board, $menu) {
     
@@ -1216,8 +1257,8 @@ class BoardController extends Model
             if (isset($uploadedFiles[$fileInputName]) && $uploadedFiles[$fileInputName]->getError() === UPLOAD_ERR_OK) {
                 $file = $uploadedFiles[$fileInputName];
                 
-                $uploadDir = __DIR__ . '/../public/data/uploads/images';
-                if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+                $uploadDir = __DIR__ . '/../../public/data/uploads/images';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, recursive: true);
                 
                 $filename = uniqid() . '_' . $file->getClientFilename();
                 $file->moveTo($uploadDir . '/' . $filename);
@@ -1247,6 +1288,7 @@ class BoardController extends Model
                 'group_id' => $menu->group_id,
                 'board_id' => $board->id,
                 'user_id' => $userId,
+                'doc_num' => $nextNum,
                 'nickname' => $nickname,
                 'title' => $title,
                 'content' => $content,

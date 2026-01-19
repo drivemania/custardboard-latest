@@ -17,6 +17,7 @@
                     <th class="px-6 py-3">닉네임</th>
                     <th class="px-6 py-3">레벨</th>
                     <th class="px-6 py-3">가입일</th>
+                    <th class="px-6 py-3">마지막 접속일</th>
                     <th class="px-6 py-3 text-right">관리</th>
                 </tr>
             </thead>
@@ -39,6 +40,7 @@
                         @endif
                     </td>
                     <td class="px-6 py-4 text-gray-500">{{ substr($user->created_at, 0, 10) }}</td>
+                    <td class="px-6 py-4 text-gray-500">{{ substr($user->last_login_at, 0, 10) }}</td>
                     <td class="px-6 py-4 text-right">
                         <a href="{{ $base_path }}/admin/users/{{ $user->id }}" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-xs font-bold">
                             관리

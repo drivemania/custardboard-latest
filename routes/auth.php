@@ -78,6 +78,12 @@ $app->post('/login', function (Request $request, Response $response) use ($baseP
         setcookie('AUTOLOGIN', $cookieValue, time() + (86400 * 30), '/', '', false, true);
     }
 
+    DB::table('users')
+    ->where('user_id', $userId)
+    ->update([
+        'last_login_at' => date("Y-m-d H:i:s")
+    ]);
+
     $_SESSION['user_idx'] = $user->id;
     $_SESSION['user_id']  = $user->user_id;
     $_SESSION['nickname'] = $user->nickname;

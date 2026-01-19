@@ -6,6 +6,7 @@
     <title>@yield('title', 'Admin') - 관리자</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
     <style>
         [x-cloak] { display: none !important; }
         body { font-family: 'Pretendard', sans-serif; }
@@ -77,7 +78,7 @@
                             대시보드
                         </a>
                     </li>
-                    <li class="pt-4 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">커뮤니티 그룹 관리</li>
+                    <li class="pt-1 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">커뮤니티 그룹 관리</li>
                     <li>
                         <a href="{{ $base_path }}/admin/groups" class="block px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition">
                             커뮤니티 그룹 설정
@@ -88,7 +89,7 @@
                             메뉴 관리
                         </a>
                     </li>
-                    <li class="pt-4 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">캐릭터 관리</li>
+                    <li class="pt-1 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">캐릭터 관리</li>
                     <li>
                         <a href="{{ $base_path }}/admin/characters" class="block px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition">
                             캐릭터 관리
@@ -99,15 +100,10 @@
                             프로필 양식 설정
                         </a>
                     </li>
-                    <li class="pt-4 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">사이트 관리</li>
+                    <li class="pt-1 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">사이트 관리</li>
                     <li>
                         <a href="{{ $base_path }}/admin/boards" class="block px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition">
                             게시판/페이지 관리
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ $base_path }}/admin/plugins" class="block px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition">
-                            플러그인 관리
                         </a>
                     </li>
                     <li>
@@ -115,8 +111,25 @@
                             이모티콘 관리
                         </a>
                     </li>
-                    
-                    <li class="pt-4 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">회원 관리</li>
+                    <li class="pt-1 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">아이템/정산 관리</li>
+                    <li>
+                        <a href="{{ $base_path }}/admin/items" class="block px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition">
+                            아이템 관리
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ $base_path }}/admin/settlements" class="block px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition">
+                            정산 관리
+                        </a>
+                    </li>
+                    <li class="pt-1 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">플러그인 관리</li>
+                    <li>
+                        <a href="{{ $base_path }}/admin/plugins" class="block px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition">
+                            플러그인 관리
+                        </a>
+                    </li>
+                    @php \App\Support\Hook::filter('plugin_menu', $base_path); @endphp
+                    <li class="pt-1 px-6 text-xs text-gray-500 uppercase tracking-wider font-bold">회원 관리</li>
                     <li>
                         <a href="{{ $base_path }}/admin/users" class="block px-6 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition">
                             회원 관리

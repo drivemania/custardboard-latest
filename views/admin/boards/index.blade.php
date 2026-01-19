@@ -24,7 +24,7 @@
                 @foreach($boards as $b)
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 font-bold text-gray-800">{{ $b->title }}</td>
-                    <td class="px-6 py-4 text-xs text-gray-500">{{ $b->board_skin }}</td>
+                    <td class="px-6 py-4 text-xs text-gray-500">{{ $b->board_skin ?? '페이지' }}</td>
                     <td class="px-6 py-4 text-right space-x-2">
                         <a href="{{ $base_path }}/admin/boards/{{ $b->id }}" class="inline-block text-blue-600 bg-blue-50 py-1 px-3 rounded text-sm">⚙️ 설정</a>
                         <button type="button" onclick="copyBoard({{ $b->id }})" class="inline-block text-green-600 bg-green-50 rounded py-1 px-3 text-sm">복사</button>

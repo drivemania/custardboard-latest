@@ -20,9 +20,16 @@
                     </div>
 
                     <div>
+                        @php
+                        if($menu->type == 'link'){
+                            $href = $menu->target_url;
+                        }else{
+                            $href = $base_path.'/au/'.$group->slug.'/'.$menu->slug;
+                        }
+                        @endphp
                         <span class="font-bold text-gray-800">{{ $menu->title }}</span>
-                        <a class="text-xs text-gray-500 block mt-1" href="{{ $base_path.'/au/'.$group->slug.'/'.$menu->slug }}" target="_blank">
-                            URL: <span class="text-blue-600 font-mono">{{ $menu->slug }}</span>
+                        <a class="text-xs text-gray-500 block mt-1" href="{{ $href }}" target="_blank">
+                            URL: <span class="text-blue-600 font-mono">{{ ($menu->slug && $menu->slug != "") ? $menu->slug : $menu->target_url }}</span>
                         </a>
                         
                         <div class="mt-1">
@@ -32,19 +39,19 @@
                                 </span>
                             @elseif($menu->type === 'load')
                                 <span class="text-xs bg-yellow-100 text-green-700 px-2 py-0.5 rounded">
-                                    🎨 로드비 게시판
+                                    🎨 로드비 게시판: {{ $menu->board_title }} (ID:{{ $menu->target_id }})
                                 </span>
                             @elseif($menu->type === 'character')
                                 <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                    🧙‍♂️ 캐릭터 게시판
+                                    🧙‍♂️ 캐릭터 게시판: {{ $menu->board_title }} (ID:{{ $menu->target_id }})
                                 </span>
                             @elseif($menu->type === 'page')
                                 <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
-                                    📑 페이지
+                                    📑 페이지: {{ $menu->board_title }} (ID:{{ $menu->target_id }})
                                 </span>
                             @else
                                 <span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
-                                    🔗 기타
+                                    🔗 링크
                                 </span>
                             @endif
                         </div>
@@ -83,12 +90,13 @@
                     <option value="load">🎨 로드비 게시판 연결</option>
                     <option value="character">🧙‍♂️ 캐릭터 게시판 연결</option>
                     <option value="page">📑 페이지 연결</option>
+                    <option value="link">🔗 링크 연결</option>
                 </select>
             </div>
 
-            <div class="mb-5">
+            <div class="mb-5" x-show="menuType != 'link'">
                 <label class="block text-sm font-bold mb-2 text-gray-700">연결할 게시판 원본</label>
-                <select name="target_id" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                <select name="target_id" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" :required="menuType != 'link'">
                     <option value="">게시판을 선택하세요</option>
                     <optgroup label="📄 일반 게시판" x-show="menuType === 'board'">
                         @foreach($allBoards as $board)
@@ -125,16 +133,21 @@
                 <p class="text-xs text-gray-500 mt-1">※ '게시판 관리'에서 생성한 게시판 목록입니다.</p>
             </div>
 
+            <div class="mb-5" x-show="menuType === 'link'">
+                <label class="block text-sm font-bold mb-2 text-gray-700">링크 주소</label>
+                <input type="text" name="target_url" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://~~~" :required="menuType === 'link'">
+            </div>
+
             <div class="mb-5">
                 <label class="block text-sm font-bold mb-2 text-gray-700">메뉴 이름</label>
                 <input type="text" name="title" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="예: 자유게시판, 멤버소개" required>
             </div>
 
-            <div class="mb-6">
+            <div class="mb-6" x-show="menuType != 'link'">
                 <label class="block text-sm font-bold mb-2 text-gray-700">접속 URL (Slug)</label>
                 <div class="flex items-center">
                     <span class="bg-gray-100 border border-r-0 border-gray-300 rounded-l px-3 py-2 text-gray-500 text-sm">/{{ $group->slug }}/</span>
-                    <input type="text" name="slug" class="w-full border border-gray-300 rounded-r px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="free, member" required>
+                    <input type="text" name="slug" pattern="[a-z0-9\-_]+" class="w-full border border-gray-300 rounded-r px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="free, member" :required="menuType != 'link'">
                 </div>
             </div>
 

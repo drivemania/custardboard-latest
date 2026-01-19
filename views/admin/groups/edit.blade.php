@@ -40,6 +40,19 @@
                     <p class="text-xs text-gray-500 mt-1">메타 태그의 description에 들어갈 내용입니다.</p>
                 </div>
 
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">
+                        재화명
+                        <div x-data="{ tooltip: false, modal: false }" class="inline-block ml-1 relative align-middle">
+                            <button type="button" @mouseenter="tooltip=true" @mouseleave="tooltip=false" class="text-gray-400 hover:text-blue-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>
+                            <div x-show="tooltip" class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 bg-gray-800 text-white text-xs rounded py-1 px-2 z-10 text-center pointer-events-none">
+                                커뮤니티에서 쓰일 재화의 이름(예시: 포인트, 원, 달러 등...)을 설정해주세요.
+                            </div>
+                        </div>
+                    </label>
+                    <input name="point_name" type="text" value="{{ $group->point_name }}" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+
                 <div class="mt-4 p-4 border rounded bg-gray-50">
                     <label class="flex items-center cursor-pointer">
                         <input type="checkbox" name="use_notification" value="1" class="w-5 h-5 text-blue-600 rounded" 
