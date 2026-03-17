@@ -292,7 +292,7 @@ CREATE TABLE `__PREFIX__shops` (
     `npc_name` VARCHAR(100) NOT NULL,
     `description` TEXT NULL,
     `is_open` TINYINT(1) NOT NULL DEFAULT 1,
-    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `is_deleted` TINYINT(1) NOT NULL DEFAULT 0,
     `deleted_at` timestamp NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
