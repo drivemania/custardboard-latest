@@ -16,7 +16,7 @@ include __DIR__ . '/header.php';
     <div class="grid grid-cols-3 gap-4">
         <div class="col-span-2">
             <label class="block text-xs font-bold text-gray-600 mb-1">DB Host</label>
-            <input type="text" name="db_host" value="<?php echo $data['db_host'] ?? '127.0.0.1'; ?>" class="w-full border border-gray-300 rounded p-2 focus:outline-none focus:border-amber-500" required>
+            <input type="text" name="db_host" value="<?php echo $data['db_host'] ?? 'localhost'; ?>" class="w-full border border-gray-300 rounded p-2 focus:outline-none focus:border-amber-500" required>
         </div>
         <div>
             <label class="block text-xs font-bold text-gray-600 mb-1">Port</label>
@@ -26,7 +26,7 @@ include __DIR__ . '/header.php';
 
     <div>
         <label class="block text-xs font-bold text-gray-600 mb-1">DB Name</label>
-        <input type="text" name="db_name" value="<?php echo $data['db_name'] ?? ''; ?>" placeholder="ex) my_board" class="w-full border border-gray-300 rounded p-2 focus:outline-none focus:border-amber-500" required>
+        <input type="text" name="db_name" value="<?php echo $data['db_name'] ?? ''; ?>" placeholder="" class="w-full border border-gray-300 rounded p-2 focus:outline-none focus:border-amber-500" required>
     </div>
 
     <div class="grid grid-cols-2 gap-4">
