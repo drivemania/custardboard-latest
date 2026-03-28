@@ -35,10 +35,20 @@
                 </label>
             </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1">
             <div>
                 <label class="block text-sm font-bold mb-2">게시판 이름</label>
                 <input type="text" name="title" value="{{ $board->title }}" class="w-full border rounded px-3 py-2">
+            </div>
+        </div>
+    </div>
+    <div class="bg-white p-6 rounded-lg shadow-sm mb-6">
+        <h3 class="text-lg font-bold border-b pb-2 mb-4">🔒 권한 설정</h3>
+        <div class="grid grid-cols-1">
+            <div>
+                <label class="block text-sm font-bold mb-2 text-neutral-600">보기 권한</label>
+                <input type="number" name="read_level" value="{{ $board->read_level }}" class="w-50 border rounded px-2 py-1 text-center mx-auto">
+                <div class="text-xs text-neutral-400 mt-1">0:손님, 1:회원, 10:관리자</div>
             </div>
         </div>
     </div>

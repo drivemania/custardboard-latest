@@ -29,6 +29,13 @@ class AutoLoginMiddleware
                     $_SESSION['user_id']  = $user->user_id;
                     $_SESSION['nickname'] = $user->nickname;
                     $_SESSION['level']    = $user->level;
+                    if(date("Ymd", strtotime($user->last_login_at)) < date("Ymd")) {
+                        DB::table('users')
+                        ->where('user_id', $user->id)
+                        ->update([
+                            'last_login_at' => date("Y-m-d H:i:s")
+                        ]);
+                    }
                 }
             }
         }

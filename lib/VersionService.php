@@ -2,7 +2,7 @@
 namespace App\Services;
 
 class VersionService {
-    const CURRENT_VERSION = '0.4.0';
+    const CURRENT_VERSION = '0.4.1';
     const CURRENT_CODENAME = 'Cinnamon';
     
     const UPDATE_URL = 'https://drivemania.github.io/custardboard-doc/version.json';

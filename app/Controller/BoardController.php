@@ -1256,7 +1256,7 @@ class BoardController extends Model
             $mainUrl = $this->basePath . '/au/' . $groupSlug;
         }else{
             $group = DB::table('groups')->where('is_default', 1)->first();
-            $mainUrl = $this->basePath;
+            $mainUrl = $this->basePath . '/';
         }
 
         if (!$group) {
@@ -1350,7 +1350,7 @@ class BoardController extends Model
             $skinViewPath = 'character.' . $skinName;
 
             $themeLayout = ($group->theme ?? 'basic') . ".layout";
-            $currentUrl = $mainUrl . "/$menuSlug";
+            $currentUrl = $mainUrl . "$menuSlug";
             $skinUrl = (object) array(
                 'documents' => $this->basePath . '/public/skins/board/' . $board->board_skin
             );

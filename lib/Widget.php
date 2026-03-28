@@ -47,7 +47,8 @@ class Widget {
 
             $currentUri = parse_url($_SERVER['REQUEST_URI'])['path'] ?? '';
             $isActive = '';
-            if(strpos($currentUri, $m->slug) !== false){
+            $type = explode('/', $currentUri);
+            if( ( $type[1] == 'au' && $type[3] == $m->slug ) || $type[1] == $m->slug){
                 if($m->type != 'link'){
                     if($m->type != 'shop') {
                         $isActive = ' active';
@@ -56,6 +57,7 @@ class Widget {
                     }
                 }
             }
+
 
             $html .= '<li class="custard-menu-item' . $isActive . '">';
             $html .= '<a href="' . $link . '" class="custard-menu-link" '.$a_target.'>' . htmlspecialchars($m->title) . '</a>';

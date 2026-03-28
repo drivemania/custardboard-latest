@@ -37,7 +37,7 @@
         </div>
         <div class="mt-8">
             <div class="text-center">
-                <p class="text-2xl font-bold"> " {{ $character->description }} "</p>
+                <p class="text-2xl font-bold mb-3"> " {{ $character->description }} "</p>
                 <img src="{{ $character->image_path2 }}" class="inline-block">
             </div>
             <hr class="mb-10">
